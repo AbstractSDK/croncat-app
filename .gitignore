@@ -2,8 +2,6 @@
 
 artifacts/*
 
-Cargo.lock
-
 .env
 
 .vscode

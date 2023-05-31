@@ -9,9 +9,11 @@ pub fn instantiate_handler(
     _env: Env,
     _info: MessageInfo,
     _app: App,
-    _msg: AppInstantiateMsg,
+    msg: AppInstantiateMsg,
 ) -> AppResult {
-    let config: Config = Config {};
+    let config: Config = Config {
+        factory_addr: msg.factory_addr,
+    };
 
     CONFIG.save(deps.storage, &config)?;
 

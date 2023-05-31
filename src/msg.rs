@@ -1,6 +1,7 @@
 use abstract_core::app;
 use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
+use cosmwasm_std::Addr;
 
 use crate::contract::App;
 
@@ -15,7 +16,9 @@ impl app::AppQueryMsg for AppQueryMsg {}
 
 /// App instantiate message
 #[cosmwasm_schema::cw_serde]
-pub struct AppInstantiateMsg {}
+pub struct AppInstantiateMsg {
+    pub factory_addr: Addr
+}
 
 /// App execute messages
 #[cosmwasm_schema::cw_serde]
