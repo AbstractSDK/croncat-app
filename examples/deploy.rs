@@ -5,7 +5,7 @@ use cw_orch::{
 };
 
 use abstract_interface::AppDeployer;
-use app::{contract::APP_ID, interface::App};
+use app::{contract::CRONCAT_ID, interface::App};
 use semver::Version;
 
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
         .chain(chain)
         .handle(rt.handle())
         .build()?;
-    let app = App::new(APP_ID, chain);
+    let app = App::new(CRONCAT_ID, chain);
 
     app.deploy(version)?;
     Ok(())

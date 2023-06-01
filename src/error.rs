@@ -25,4 +25,7 @@ pub enum AppError {
 
     #[error("{0}")]
     DappError(#[from] AbstractAppError),
+
+    #[error("Unable to get croncat version")]
+    UnknownVersion {},
 }

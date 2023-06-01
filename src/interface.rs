@@ -4,7 +4,7 @@ use abstract_interface::AppDeployer;
 use cw_orch::interface;
 use cw_orch::prelude::*;
 
-#[interface(InstantiateMsg, ExecuteMsg, QueryMsg, MigrateMsg)]
+#[interface(AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, MigrateMsg)]
 pub struct App<Chain>;
 
 impl<Chain: CwEnv> Uploadable for App<Chain> {

@@ -56,6 +56,9 @@ abstract-interface = { git = "https://github.com/AbstractSDK/contracts.git", opt
 cw-orch = { version = "0.12", optional = true }
 
 # Croncat dependencies
+croncat-sdk-factory = "1.0.3"
+croncat-sdk-tasks = "1.0.3"
+
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }
 abstract-interface = { git = "https://github.com/AbstractSDK/contracts.git", features = [
@@ -73,7 +76,6 @@ cw-orch = { version = "0.12", features = ["daemon"] }
 cw-multi-test = "0.16.4"
 
 # Croncat intefraces
-croncat-sdk-factory = "1.0.3"
 croncat-sdk-tasks = "1.0.3"
 croncat-sdk-manager = "1.0.3"
 croncat-sdk-agents = "1.0.3"

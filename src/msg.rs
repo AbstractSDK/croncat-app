@@ -1,15 +1,15 @@
 use abstract_core::app;
 use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
-use cosmwasm_std::Addr;
+use croncat_sdk_tasks::types::TaskRequest;
 
-use crate::contract::App;
+use crate::{contract::CroncatApp, state::Config};
 
 /// Abstract App instantiate msg
-pub type InstantiateMsg = <App as InstantiateEndpoint>::InstantiateMsg;
-pub type ExecuteMsg = <App as ExecuteEndpoint>::ExecuteMsg;
-pub type QueryMsg = <App as QueryEndpoint>::QueryMsg;
-pub type MigrateMsg = <App as MigrateEndpoint>::MigrateMsg;
+pub type InstantiateMsg = <CroncatApp as InstantiateEndpoint>::InstantiateMsg;
+pub type ExecuteMsg = <CroncatApp as ExecuteEndpoint>::ExecuteMsg;
+pub type QueryMsg = <CroncatApp as QueryEndpoint>::QueryMsg;
+pub type MigrateMsg = <CroncatApp as MigrateEndpoint>::MigrateMsg;
 
 impl app::AppExecuteMsg for AppExecuteMsg {}
 impl app::AppQueryMsg for AppQueryMsg {}
@@ -17,7 +17,7 @@ impl app::AppQueryMsg for AppQueryMsg {}
 /// App instantiate message
 #[cosmwasm_schema::cw_serde]
 pub struct AppInstantiateMsg {
-    pub factory_addr: Addr
+    pub factory_addr: String,
 }
 
 /// App execute messages
@@ -25,7 +25,9 @@ pub struct AppInstantiateMsg {
 #[cfg_attr(feature = "interface", derive(cw_orch::ExecuteFns))]
 #[cfg_attr(feature = "interface", impl_into(ExecuteMsg))]
 pub enum AppExecuteMsg {
-    UpdateConfig {},
+    UpdateConfig { factory_addr: String },
+    // TODO: #[payable]
+    CreateTask { task: Box<TaskRequest> },
 }
 
 #[cosmwasm_schema::cw_serde]
@@ -46,4 +48,6 @@ pub enum Cw20HookMsg {
 }
 
 #[cosmwasm_schema::cw_serde]
-pub struct ConfigResponse {}
+pub struct ConfigResponse {
+    pub config: Config,
+}
