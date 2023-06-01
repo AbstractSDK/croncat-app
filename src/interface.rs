@@ -1,11 +1,13 @@
+use crate::contract::CRONCAT_ID;
 use crate::msg::*;
 use abstract_core::app::MigrateMsg;
 use abstract_interface::AppDeployer;
+use cw_orch::anyhow;
 use cw_orch::interface;
-use cw_orch::prelude::*;
+use cw_orch::prelude::{queriers::Node, *};
 
 #[interface(AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, MigrateMsg)]
-pub struct App<Chain>;
+pub struct App;
 
 impl<Chain: CwEnv> Uploadable for App<Chain> {
     fn wasm(&self) -> cw_orch::prelude::WasmPath {

@@ -2,13 +2,23 @@ mod common;
 
 use std::{borrow::BorrowMut, cell::RefMut};
 
-use abstract_core::{app::{BaseInstantiateMsg, BaseQueryMsg}, objects::gov_type::GovernanceDetails};
-use abstract_interface::{Abstract, AbstractAccount, AppDeployer, ManagerQueryFns, VCExecFns};
+use abstract_core::{
+    app::{BaseInstantiateMsg, BaseQueryMsg},
+    objects::{
+        gov_type::GovernanceDetails,
+        module::{ModuleInfo, ModuleVersion},
+        namespace::Namespace,
+    },
+};
+use abstract_interface::{
+    Abstract, AbstractAccount, AppDeployer, ManagerQueryFns, VCExecFns, VCQueryFns,
+};
+use abstract_sdk::{prelude::*, mock_module::{MockModule, self}};
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
     msg::{AppInstantiateMsg, AppQueryMsg, ConfigResponse, InstantiateMsg, QueryMsg},
     state::Config,
-    App,
+    App, AppQueryMsgFns,
 };
 use common::contracts;
 use cosmwasm_schema::serde::{Deserialize, Serialize};
@@ -23,7 +33,7 @@ use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
 
-use cosmwasm_std::{coin, to_binary, Addr, Uint128};
+use cosmwasm_std::{coin, to_binary, Addr, Uint128, OwnedDeps, testing::mock_dependencies};
 // consts for testing
 const ADMIN: &str = "admin";
 const VERSION: &str = "1.0";
@@ -164,7 +174,7 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>)> {
     // Instantiating croncat contracts
     let factory_addr = setup_croncat_contracts(mock.app.as_ref().borrow_mut())?;
 
-    // Construct the counter interface
+    // Construct the counter interface  
     let contract = App::new(CRONCAT_ID, mock.clone());
 
     // Deploy Abstract to the mock
@@ -182,7 +192,6 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>)> {
         .claim_namespaces(1, vec!["croncat".to_string()])?;
 
     contract.deploy(CRONCAT_MODULE_VERSION.parse()?)?;
-
     account.install_module(
         CRONCAT_ID,
         &InstantiateMsg {
@@ -196,7 +205,9 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>)> {
     )?;
     // let module_addr = account.manager.module_info(CRONCAT_ID)?.unwrap().address;
     // contract.set_address(&module_addr);
-
+    use crate::AppQueryMsgFns;
+    let config = contract.config()?;
+    println!("{config:?}");
     Ok((account, abstr_deployment))
 }
 
@@ -205,5 +216,10 @@ fn successful_install() -> anyhow::Result<()> {
     // Set up the environment and contract
     let (account, abstr) = setup()?;
 
+    let module = abstr.version_control.module(ModuleInfo {
+        namespace: Namespace::new("croncat")?,
+        name: "app".to_owned(),
+        version: ModuleVersion::Latest,
+    })?;
     Ok(())
 }
