@@ -1,10 +1,8 @@
-use crate::contract::CRONCAT_ID;
 use crate::msg::*;
 use abstract_core::app::MigrateMsg;
 use abstract_interface::AppDeployer;
-use cw_orch::anyhow;
 use cw_orch::interface;
-use cw_orch::prelude::{queriers::Node, *};
+use cw_orch::prelude::*;
 
 #[interface(InstantiateMsg, ExecuteMsg, QueryMsg, MigrateMsg)]
 pub struct App<Chain>;

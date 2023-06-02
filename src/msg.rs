@@ -1,6 +1,7 @@
 use abstract_core::app;
 use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
+use cosmwasm_std::Coin;
 use croncat_sdk_tasks::types::TaskRequest;
 
 use crate::{contract::CroncatApp, state::Config};
@@ -25,9 +26,13 @@ pub struct AppInstantiateMsg {
 #[cfg_attr(feature = "interface", derive(cw_orch::ExecuteFns))]
 #[cfg_attr(feature = "interface", impl_into(ExecuteMsg))]
 pub enum AppExecuteMsg {
-    UpdateConfig { factory_addr: String },
-    // TODO: #[payable]
-    CreateTask { task: Box<TaskRequest> },
+    UpdateConfig {
+        factory_addr: String,
+    },
+    CreateTask {
+        task: Box<TaskRequest>,
+        funds: Vec<Coin>,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]

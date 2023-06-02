@@ -1,4 +1,5 @@
 use crate::msg::AppMigrateMsg;
+use crate::replies::TASK_CREATE_REPLY_ID;
 use crate::{
     error::AppError,
     handlers,
@@ -25,7 +26,10 @@ const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSI
     .with_execute(handlers::execute_handler)
     .with_query(handlers::query_handler)
     .with_migrate(handlers::migrate_handler)
-    .with_replies(&[(INSTANTIATE_REPLY_ID, replies::instantiate_reply)]);
+    .with_replies(&[
+        (INSTANTIATE_REPLY_ID, replies::instantiate_reply),
+        (TASK_CREATE_REPLY_ID, replies::create_task_reply),
+    ]);
 
 // Export handlers
 #[cfg(feature = "export")]

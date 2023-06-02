@@ -3,7 +3,7 @@ mod common;
 use std::{borrow::BorrowMut, cell::RefMut};
 
 use abstract_core::{
-    app::{BaseInstantiateMsg, BaseQueryMsg},
+    app::{BaseExecuteMsg, BaseInstantiateMsg, BaseQueryMsg},
     objects::{
         gov_type::GovernanceDetails,
         module::{ModuleInfo, ModuleVersion},
@@ -11,7 +11,7 @@ use abstract_core::{
     },
 };
 use abstract_interface::{
-    Abstract, AbstractAccount, AppDeployer, ManagerQueryFns, VCExecFns, VCQueryFns,
+    Abstract, AbstractAccount, AppDeployer, ManagerExecFns, ManagerQueryFns, VCExecFns, VCQueryFns,
 };
 use abstract_sdk::{
     mock_module::{self, MockModule},
@@ -19,9 +19,12 @@ use abstract_sdk::{
 };
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
-    msg::{AppInstantiateMsg, AppQueryMsg, ConfigResponse, InstantiateMsg, QueryMsg},
+    msg::{
+        AppExecuteMsg, AppInstantiateMsg, AppQueryMsg, ConfigResponse, ExecuteMsg, InstantiateMsg,
+        QueryMsg,
+    },
     state::Config,
-    App, AppQueryMsgFns,
+    App, AppExecuteMsgFns, AppQueryMsgFns,
 };
 use common::contracts;
 use cosmwasm_schema::serde::{Deserialize, Serialize};
@@ -30,13 +33,18 @@ use croncat_sdk_factory::msg::{
     FactoryInstantiateMsg, FactoryQueryMsg, ModuleInstantiateInfo, VersionKind,
 };
 use croncat_sdk_manager::msg::ManagerInstantiateMsg;
-use croncat_sdk_tasks::msg::TasksInstantiateMsg;
+use croncat_sdk_tasks::{
+    msg::TasksInstantiateMsg,
+    types::{Action, TaskRequest},
+};
 
 use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
 
-use cosmwasm_std::{coin, testing::mock_dependencies, to_binary, Addr, OwnedDeps, Uint128};
+use cosmwasm_std::{
+    coin, coins, testing::mock_dependencies, to_binary, Addr, BankMsg, OwnedDeps, Uint128,
+};
 // consts for testing
 const ADMIN: &str = "admin";
 const VERSION: &str = "1.0";
@@ -178,8 +186,7 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
     let factory_addr = setup_croncat_contracts(mock.app.as_ref().borrow_mut())?;
 
     // Construct the counter interface
-    let contract = App::new(CRONCAT_ID, mock.clone());
-
+    let mut contract = App::new(CRONCAT_ID, mock.clone());
     // Deploy Abstract to the mock
     let abstr_deployment = Abstract::deploy_on(mock.clone(), Empty {})?;
     // Create a new account to install the app onto
@@ -209,6 +216,8 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
 
     let module_addr = account.manager.module_info(CRONCAT_ID)?.unwrap().address;
     contract.set_address(&module_addr);
+    let manager_addr = account.manager.address()?;
+    contract.set_sender(&manager_addr);
 
     Ok((account, abstr_deployment, contract))
 }
@@ -217,8 +226,38 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
 fn successful_install() -> anyhow::Result<()> {
     // Set up the environment and contract
     let (account, abstr, contract) = setup()?;
-    
-    let config: ConfigResponse = contract.config()?;
-    println!("{config:?}");
+
+    let task = TaskRequest {
+        interval: croncat_sdk_tasks::types::Interval::Once,
+        boundary: None,
+        stop_on_fail: false,
+        actions: vec![Action {
+            msg: BankMsg::Send {
+                to_address: "receiver".to_owned(),
+                amount: coins(1, DENOM),
+            }
+            .into(),
+            gas_limit: None,
+        }],
+        queries: None,
+        transforms: None,
+        cw20: None,
+    };
+
+    // TODO: MAKE IT WORK
+    // let exec_msg = app::msg::ExecuteMsg {
+    //     base: BaseExecuteMsg::UpdateConfig {
+    //         ans_host_address: None,
+    //     },
+    //     module: AppExecuteMsg::CreateTask {
+    //         task: Box::new(task),
+    //         funds: coins(45_000, DENOM),
+    //     },
+    // };
+    // account
+    //     .manager
+    //     .exec_on_module(to_binary(&execute_msg)?, CRONCAT_ID.to_owned())?;
+
+    contract.create_task(coins(45_000, DENOM), Box::new(task))?;
     Ok(())
 }

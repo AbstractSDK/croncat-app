@@ -1,5 +1,6 @@
 use abstract_sdk::features::AbstractResponse;
-use cosmwasm_std::{to_binary, DepsMut, Env, MessageInfo, Response, WasmMsg};
+use abstract_sdk::{Execution, TransferInterface};
+use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, WasmMsg};
 use croncat_sdk_factory::msg::FactoryQueryMsg;
 use croncat_sdk_tasks::msg::TasksExecuteMsg;
 use croncat_sdk_tasks::types::TaskRequest;
@@ -12,7 +13,7 @@ use crate::state::{Config, CONFIG};
 
 pub fn execute_handler(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     app: CroncatApp,
     msg: AppExecuteMsg,
@@ -21,7 +22,9 @@ pub fn execute_handler(
         AppExecuteMsg::UpdateConfig { factory_addr } => {
             update_config(deps, info, app, factory_addr)
         }
-        AppExecuteMsg::CreateTask { task } => create_task(deps, info, app, task),
+        AppExecuteMsg::CreateTask { task, funds } => {
+            create_task(deps.as_ref(), env, info, app, task, funds)
+        }
     }
 }
 
@@ -43,12 +46,18 @@ fn update_config(
 
 /// Create a task
 fn create_task(
-    deps: DepsMut,
+    deps: Deps,
+    env: Env,
     msg_info: MessageInfo,
     app: CroncatApp,
     task_request: Box<TaskRequest>,
+    funds: Vec<Coin>,
 ) -> CroncatResult {
-    app.admin.assert_admin(deps.as_ref(), &msg_info.sender)?;
+    app.admin.assert_admin(deps, &msg_info.sender)?;
+
+    let bank = app.bank(deps);
+    let withdraw_msg = bank.withdraw(&env, funds.clone())?;
+    let transfer_msg = bank.transfer(funds.clone(), &env.contract.address)?;
     let config = CONFIG.load(deps.storage)?;
 
     let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
@@ -62,12 +71,18 @@ fn create_task(
         .metadata
         .ok_or(AppError::UnknownVersion {})?
         .contract_addr;
-    let response = Response::default().add_message(WasmMsg::Execute {
-        contract_addr: tasks_addr.to_string(),
-        msg: to_binary(&TasksExecuteMsg::CreateTask { task: task_request })?,
-        // TODO: take funds from manager?
-        funds: msg_info.funds,
-    });
+
+    let bank_msgs = app
+        .executor(deps)
+        .execute(vec![withdraw_msg, transfer_msg])?;
+
+    let response = Response::default()
+        .add_message(bank_msgs)
+        .add_message(WasmMsg::Execute {
+            contract_addr: tasks_addr.to_string(),
+            msg: to_binary(&TasksExecuteMsg::CreateTask { task: task_request })?,
+            funds: msg_info.funds,
+        });
     // TODO: parse reply
     Ok(app.tag_response(response, "create_task"))
 }
