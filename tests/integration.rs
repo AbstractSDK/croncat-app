@@ -218,7 +218,10 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
     contract.set_address(&module_addr);
     let manager_addr = account.manager.address()?;
     contract.set_sender(&manager_addr);
+    mock.set_balance(&account.proxy.address()?, coins(50_000, DENOM))?;
 
+    let addr = account.proxy.address()?;
+    println!("proxy_addr: {addr}");
     Ok((account, abstr_deployment, contract))
 }
 
@@ -244,7 +247,7 @@ fn successful_install() -> anyhow::Result<()> {
         cw20: None,
     };
 
-    // TODO: MAKE IT WORK
+    // TODO: MAKE IT COMPILE LOL
     // let exec_msg = app::msg::ExecuteMsg {
     //     base: BaseExecuteMsg::UpdateConfig {
     //         ans_host_address: None,

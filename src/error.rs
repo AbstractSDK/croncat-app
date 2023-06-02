@@ -4,6 +4,7 @@ use abstract_sdk::AbstractSdkError;
 use cosmwasm_std::StdError;
 use cw_asset::AssetError;
 use cw_controllers::AdminError;
+use cw_utils::ParseReplyError;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -25,6 +26,9 @@ pub enum AppError {
 
     #[error("{0}")]
     DappError(#[from] AbstractAppError),
+
+    #[error("{0}")]
+    ParseReplyError(#[from] ParseReplyError),
 
     #[error("Unable to get croncat version")]
     UnknownVersion {},

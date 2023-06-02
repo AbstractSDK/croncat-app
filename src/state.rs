@@ -7,5 +7,5 @@ pub struct Config {
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
-// Map: `tasks_addr`:[`task_hash`]
-pub const ACTIVE_TASKS: Map<Addr, Vec<Vec<u8>>> = Map::new("active_tasks");
+// Map: `task_version`:[`task_hash`]
+pub const ACTIVE_TASKS: Map<&str, Vec<Vec<u8>>> = Map::new("active_tasks");

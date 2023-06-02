@@ -1,6 +1,6 @@
 use abstract_sdk::features::AbstractResponse;
-use abstract_sdk::{Execution, TransferInterface};
-use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, WasmMsg};
+use abstract_sdk::{AdapterInterface, Execution, TransferInterface};
+use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, SubMsg, WasmMsg};
 use croncat_sdk_factory::msg::FactoryQueryMsg;
 use croncat_sdk_tasks::msg::TasksExecuteMsg;
 use croncat_sdk_tasks::types::TaskRequest;
@@ -9,6 +9,7 @@ use crate::contract::{CroncatApp, CroncatResult};
 
 use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
+use crate::replies::TASK_CREATE_REPLY_ID;
 use crate::state::{Config, CONFIG};
 
 pub fn execute_handler(
@@ -57,7 +58,7 @@ fn create_task(
 
     let bank = app.bank(deps);
     let withdraw_msg = bank.withdraw(&env, funds.clone())?;
-    let transfer_msg = bank.transfer(funds.clone(), &env.contract.address)?;
+    // TODO: withdraw->send for cw20s
     let config = CONFIG.load(deps.storage)?;
 
     let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
@@ -72,17 +73,19 @@ fn create_task(
         .ok_or(AppError::UnknownVersion {})?
         .contract_addr;
 
-    let bank_msgs = app
-        .executor(deps)
-        .execute(vec![withdraw_msg, transfer_msg])?;
+    let bank_msgs = app.executor(deps).execute(vec![withdraw_msg])?;
 
-    let response = Response::default()
-        .add_message(bank_msgs)
-        .add_message(WasmMsg::Execute {
-            contract_addr: tasks_addr.to_string(),
-            msg: to_binary(&TasksExecuteMsg::CreateTask { task: task_request })?,
-            funds: msg_info.funds,
-        });
+    let response =
+        Response::default()
+            .add_message(bank_msgs)
+            .add_submessage(SubMsg::reply_on_success(
+                WasmMsg::Execute {
+                    contract_addr: tasks_addr.to_string(),
+                    msg: to_binary(&TasksExecuteMsg::CreateTask { task: task_request })?,
+                    funds,
+                },
+                TASK_CREATE_REPLY_ID,
+            ));
     // TODO: parse reply
     Ok(app.tag_response(response, "create_task"))
 }
