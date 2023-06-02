@@ -4,8 +4,9 @@ version = 3
 
 [[package]]
 name = "abstract-account-factory"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8190351b98c6bbee12ea8d3945ba10c5388d0653ca09409596f009c144625257"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -26,8 +27,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-ans-host"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90e0d52f00f770fa6edb4e006778ba357a837b9a493df1db33596ffa6d481c11"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -45,8 +47,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-app"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44f82ada643f7ee7ff3b0131af761d69922d219e2e29ce51857d3693bb6f04c3"
 dependencies = [
  "abstract-core",
  "abstract-sdk",
@@ -64,8 +67,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-core"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d95a9ee73c2664ad7807d0222f54411788f3860d0b6080399298058f71c82eea"
 dependencies = [
  "abstract-ica",
  "cosmwasm-schema",
@@ -89,8 +93,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-ica"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b66cc47c8c97c6a29766bae976d031a686162a662a180241eae351c19742b782"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -101,8 +106,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-interface"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "883baa416a2c00a27196786dd74392d56d6a4c23d5d4781c393ea84ea21d9041"
 dependencies = [
  "abstract-account-factory",
  "abstract-ans-host",
@@ -130,8 +136,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-macros"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ddbcb226d02c9368e6742361c2356bb56f0977be76236450e34685374c65e2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -140,8 +147,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-manager"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff7c1e522b71596ce173042fd9db1a62bb5e245106872ff2b544103047c23c51"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -163,8 +171,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-module-factory"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487d05cdf1cfffe89d5e05d04a7a42773dfed93b4bcc2c1e147a72503f59f45d"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -183,8 +192,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-proxy"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "710f132f9fdb0b6d4efef4bce23d8b64b3abe60900a2a96f8c7ff5732655fe9b"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -204,8 +214,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-sdk"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f06467fc346e02b05c7f5d9f2d879a0bae8023288baf7ee8a83a74208a15f4d9"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -225,8 +236,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-testing"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3004ddd1b3eb78c2d3992648259dbb7a3c16ac774a21c2fc27c5c2e07bc01a2"
 dependencies = [
  "abstract-core",
  "cosmwasm-schema",
@@ -247,8 +259,9 @@ dependencies = [
 
 [[package]]
 name = "abstract-version-control"
-version = "0.15.0"
-source = "git+https://github.com/AbstractSDK/contracts.git#84b07cf740f9ed881d291eeabfe2f137b671fc37"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b08319c8e3d6de8030589e65f6443d0380af685bf5f6ff10b80233319be12fa"
 dependencies = [
  "abstract-core",
  "abstract-macros",
@@ -475,9 +488,9 @@ checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
 name = "bip32"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e40748d60a3296653e45e87e64c6989aebfad607bccce59cc4156c5d81b2f70"
+checksum = "7e141fb0f8be1c7b45887af94c88b182472b57c96b56773250ae00cd6a14a164"
 dependencies = [
  "bs58",
  "hmac",
@@ -545,11 +558,11 @@ dependencies = [
 
 [[package]]
 name = "bs58"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
+checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
 dependencies = [
- "sha2 0.9.9",
+ "sha2 0.10.6",
 ]
 
 [[package]]
@@ -2377,9 +2390,9 @@ checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
 name = "mio"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eebffdb73fe72e917997fad08bdbf31ac50b0fa91cec93e69a0662e4264d454c"
+checksum = "927a765cd3fc26206e66b296465fa9d3e5ab003e651c1b3c060e7956d96b19d2"
 dependencies = [
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
@@ -2535,9 +2548,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.52"
+version = "0.10.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01b8574602df80f7b85fdfc5392fa884a4e3b3f4f35402c070ab34c3d3f78d56"
+checksum = "69b3f656a17a6cbc115b5c7a40c616947d213ba182135b014d6051b73ab6f019"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -2567,9 +2580,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.87"
+version = "0.9.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e17f59264b2809d77ae94f0e1ebabc434773f370d6ca667bd223ea10e06cc7e"
+checksum = "c2ce0f250f34a308dcfdbb351f511359857d4ed2134ba715a4eadd46e1ffd617"
 dependencies = [
  "cc",
  "libc",

@@ -39,20 +39,20 @@ interface = ["export", "dep:abstract-interface", "dep:cw-orch"]
 schema = ["abstract-app/schema"]
 
 [dependencies]
-cosmwasm-std = { version = "1.1" }
-cosmwasm-schema = { version = "1.1" }
+cosmwasm-std = { version = "1.2" }
+cosmwasm-schema = { version = "1.2" }
 cw-controllers = { version = "1.0.1" }
 cw-storage-plus = "1.0.1"
 thiserror = { version = "1.0" }
 schemars = "0.8"
 cw-asset = { version = "3.0" }
 
-abstract-core = { git = "https://github.com/AbstractSDK/contracts.git" }
-abstract-app = { git = "https://github.com/AbstractSDK/contracts.git" }
-abstract-sdk = { git = "https://github.com/AbstractSDK/contracts.git" }
+abstract-core = { version = "0.15.3" }
+abstract-app = { version = "0.15.3" }
+abstract-sdk = { version = "0.15.3" }
 
 # Dependencies for interface
-abstract-interface = { git = "https://github.com/AbstractSDK/contracts.git", optional = true }
+abstract-interface = { version = "0.15.3", optional = true }
 cw-orch = { version = "0.12", optional = true }
 
 # Croncat dependencies
@@ -61,13 +61,9 @@ croncat-sdk-tasks = "1.0.3"
 
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }
-abstract-interface = { git = "https://github.com/AbstractSDK/contracts.git", features = [
-  "daemon",
-] }
-abstract-testing = { git = "https://github.com/AbstractSDK/contracts.git" }
-abstract-sdk = { git = "https://github.com/AbstractSDK/contracts.git", features = [
-  "test-utils",
-] }
+abstract-interface = { version = "0.15.3", features = ["daemon"] }
+abstract-testing = { version = "0.15.3" }
+abstract-sdk = { version = "0.15.3", features = ["test-utils"] }
 speculoos = "0.11.0"
 semver = "1.0"
 dotenv = "0.15.0"

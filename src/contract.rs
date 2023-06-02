@@ -17,7 +17,8 @@ pub const CRONCAT_ID: &str = "croncat:app";
 pub type CroncatResult<T = Response> = Result<T, AppError>;
 
 /// The type of the app that is used to build your app and access the Abstract SDK features.
-pub type CroncatApp = AppContract<AppError, AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, AppMigrateMsg>;
+pub type CroncatApp =
+    AppContract<AppError, AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, AppMigrateMsg>;
 
 const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSION, None)
     .with_instantiate(handlers::instantiate_handler)

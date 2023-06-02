@@ -6,8 +6,8 @@ use cw_orch::anyhow;
 use cw_orch::interface;
 use cw_orch::prelude::{queriers::Node, *};
 
-#[interface(AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, MigrateMsg)]
-pub struct App;
+#[interface(InstantiateMsg, ExecuteMsg, QueryMsg, MigrateMsg)]
+pub struct App<Chain>;
 
 impl<Chain: CwEnv> Uploadable for App<Chain> {
     fn wasm(&self) -> cw_orch::prelude::WasmPath {
