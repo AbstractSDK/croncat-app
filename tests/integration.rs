@@ -1,37 +1,19 @@
 mod common;
 
-use std::{borrow::BorrowMut, cell::RefMut};
+use std::cell::RefMut;
 
-use abstract_core::{
-    app::{BaseExecuteMsg, BaseInstantiateMsg, BaseQueryMsg},
-    objects::{
-        gov_type::GovernanceDetails,
-        module::{ModuleInfo, ModuleVersion},
-        namespace::Namespace,
-    },
-};
-use abstract_interface::{
-    Abstract, AbstractAccount, AppDeployer, ManagerExecFns, ManagerQueryFns, VCExecFns, VCQueryFns,
-};
-use abstract_sdk::{
-    mock_module::{self, MockModule},
-    prelude::*,
-};
+use abstract_core::{app::BaseInstantiateMsg, objects::gov_type::GovernanceDetails};
+use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
+
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
-    msg::{
-        AppExecuteMsg, AppInstantiateMsg, AppQueryMsg, ConfigResponse, ExecuteMsg, InstantiateMsg,
-        QueryMsg,
-    },
-    state::Config,
-    App, AppExecuteMsgFns, AppQueryMsgFns,
+    msg::{AppInstantiateMsg, InstantiateMsg},
+    App, AppExecuteMsgFns,
 };
 use common::contracts;
-use cosmwasm_schema::serde::{Deserialize, Serialize};
+
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;
-use croncat_sdk_factory::msg::{
-    FactoryInstantiateMsg, FactoryQueryMsg, ModuleInstantiateInfo, VersionKind,
-};
+use croncat_sdk_factory::msg::{FactoryInstantiateMsg, ModuleInstantiateInfo, VersionKind};
 use croncat_sdk_manager::msg::ManagerInstantiateMsg;
 use croncat_sdk_tasks::{
     msg::TasksInstantiateMsg,
@@ -42,9 +24,7 @@ use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
 
-use cosmwasm_std::{
-    coin, coins, testing::mock_dependencies, to_binary, Addr, BankMsg, OwnedDeps, Uint128,
-};
+use cosmwasm_std::{coin, coins, to_binary, Addr, BankMsg, Uint128};
 // consts for testing
 const ADMIN: &str = "admin";
 const VERSION: &str = "1.0";
@@ -89,7 +69,7 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         contract_name: "manager".to_owned(),
     };
     app.execute_contract(
-        sender.clone(),
+        sender,
         factory_addr.clone(),
         &croncat_factory::msg::ExecuteMsg::Deploy {
             kind: VersionKind::Agents,
@@ -228,7 +208,7 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
 #[test]
 fn successful_install() -> anyhow::Result<()> {
     // Set up the environment and contract
-    let (account, abstr, contract) = setup()?;
+    let (_account, _abstr, contract) = setup()?;
 
     let task = TaskRequest {
         interval: croncat_sdk_tasks::types::Interval::Once,

@@ -1,12 +1,11 @@
-use abstract_core::objects::AnsAsset;
 use abstract_sdk::features::AbstractResponse;
-use abstract_sdk::{AdapterInterface, Execution, TransferInterface, Transferable};
+use abstract_sdk::{Execution, TransferInterface};
 use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, SubMsg, WasmMsg};
 use croncat_sdk_factory::msg::FactoryQueryMsg;
 use croncat_sdk_tasks::msg::TasksExecuteMsg;
 use croncat_sdk_tasks::types::TaskRequest;
-use cw20::{Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg};
-use cw_asset::{Asset, AssetBase, AssetInfo};
+use cw20::{Cw20Coin, Cw20ExecuteMsg};
+use cw_asset::{Asset, AssetInfo};
 
 use crate::contract::{CroncatApp, CroncatResult};
 
@@ -65,7 +64,7 @@ fn create_task(
     let config = CONFIG.load(deps.storage)?;
     let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
         deps.querier.query_wasm_smart(
-            &config.factory_addr,
+            config.factory_addr,
             &FactoryQueryMsg::LatestContract {
                 contract_name: "tasks".to_owned(),
             },
