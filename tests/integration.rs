@@ -20,20 +20,45 @@ use croncat_sdk_tasks::{
     types::{Action, TaskRequest},
 };
 
+use cw20::{Cw20Coin, Cw20ExecuteMsg};
 use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
 
-use cosmwasm_std::{coin, coins, to_binary, Addr, BankMsg, Uint128};
+use cosmwasm_std::{coins, to_binary, Addr, BankMsg, Uint128, WasmMsg};
 // consts for testing
 const ADMIN: &str = "admin";
 const VERSION: &str = "1.0";
 const DENOM: &str = "abstr";
 const PAUSE_ADMIN: &str = "cosmos338dwgj5wm2tuahvfjdldz5s8hmt7l5aznw8jz9s2mmgj5c52jqgfq000";
 
-fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Result<Addr> {
+fn setup_croncat_contracts(
+    mut app: RefMut<cw_multi_test::App>,
+    proxy_addr: String,
+) -> anyhow::Result<(Addr, Addr)> {
     let sender = Addr::unchecked(ADMIN);
     let pause_admin = Addr::unchecked(PAUSE_ADMIN);
+
+    // Instantiate cw20
+    let cw20_code_id = app.store_code(contracts::cw20_contract());
+    let cw20_addr = app.instantiate_contract(
+        cw20_code_id,
+        sender.clone(),
+        &cw20_base::msg::InstantiateMsg {
+            name: "croncatcoins".to_owned(),
+            symbol: "ccc".to_owned(),
+            decimals: 6,
+            initial_balances: vec![Cw20Coin {
+                address: proxy_addr,
+                amount: Uint128::new(100),
+            }],
+            mint: None,
+            marketing: None,
+        },
+        &[],
+        "cw20-contract".to_owned(),
+        None,
+    )?;
 
     let factory_code_id = app.store_code(contracts::croncat_factory_contract());
     let factory_addr = app.instantiate_contract(
@@ -56,7 +81,7 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         pause_admin: pause_admin.clone(),
         gas_price: None,
         treasury_addr: None,
-        cw20_whitelist: None,
+        cw20_whitelist: Some(vec![cw20_addr.to_string()]),
     };
     let module_instantiate_info = ModuleInstantiateInfo {
         code_id,
@@ -69,7 +94,7 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         contract_name: "manager".to_owned(),
     };
     app.execute_contract(
-        sender,
+        sender.clone(),
         factory_addr.clone(),
         &croncat_factory::msg::ExecuteMsg::Deploy {
             kind: VersionKind::Agents,
@@ -108,7 +133,7 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         contract_name: "agents".to_owned(),
     };
     app.execute_contract(
-        Addr::unchecked(ADMIN),
+        sender.clone(),
         factory_addr.to_owned(),
         &croncat_factory::msg::ExecuteMsg::Deploy {
             kind: VersionKind::Agents,
@@ -143,7 +168,7 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         contract_name: "tasks".to_owned(),
     };
     app.execute_contract(
-        Addr::unchecked(ADMIN),
+        sender,
         factory_addr.to_owned(),
         &croncat_factory::msg::ExecuteMsg::Deploy {
             kind: VersionKind::Tasks,
@@ -152,18 +177,16 @@ fn setup_croncat_contracts(mut app: RefMut<cw_multi_test::App>) -> anyhow::Resul
         &[],
     )
     .unwrap();
-    Ok(factory_addr)
+
+    Ok((factory_addr, cw20_addr))
 }
 
 /// Set up the test environment with the contract installed
-fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)> {
+fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>, Addr)> {
     // Create a sender
     let sender = Addr::unchecked(ADMIN);
     // Create the mock
     let mock = Mock::new(&sender);
-    mock.set_balance(&sender, vec![coin(100, DENOM)])?;
-    // Instantiating croncat contracts
-    let factory_addr = setup_croncat_contracts(mock.app.as_ref().borrow_mut())?;
 
     // Construct the counter interface
     let mut contract = App::new(CRONCAT_ID, mock.clone());
@@ -180,6 +203,11 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
     abstr_deployment
         .version_control
         .claim_namespaces(1, vec!["croncat".to_string()])?;
+
+    // Instantiating croncat contracts
+    mock.set_balance(&sender, coins(100, DENOM))?;
+    let (factory_addr, cw20_addr) =
+        setup_croncat_contracts(mock.app.as_ref().borrow_mut(), account.proxy.addr_str()?)?;
 
     contract.deploy(CRONCAT_MODULE_VERSION.parse()?)?;
     account.install_module(
@@ -200,47 +228,61 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>)>
     contract.set_sender(&manager_addr);
     mock.set_balance(&account.proxy.address()?, coins(50_000, DENOM))?;
 
-    let addr = account.proxy.address()?;
-    println!("proxy_addr: {addr}");
-    Ok((account, abstr_deployment, contract))
+    Ok((account, abstr_deployment, contract, cw20_addr))
 }
 
 #[test]
-fn successful_install() -> anyhow::Result<()> {
+fn successful_task_creation() -> anyhow::Result<()> {
     // Set up the environment and contract
-    let (_account, _abstr, contract) = setup()?;
+    let (_account, _abstr, contract, cw20_addr) = setup()?;
 
+    let cw20_amount = Some(Cw20Coin {
+        address: cw20_addr.to_string(),
+        amount: Uint128::new(100),
+    });
     let task = TaskRequest {
         interval: croncat_sdk_tasks::types::Interval::Once,
         boundary: None,
         stop_on_fail: false,
-        actions: vec![Action {
-            msg: BankMsg::Send {
-                to_address: "receiver".to_owned(),
-                amount: coins(1, DENOM),
-            }
-            .into(),
-            gas_limit: None,
-        }],
+        actions: vec![
+            Action {
+                msg: BankMsg::Send {
+                    to_address: "receiver".to_owned(),
+                    amount: coins(1, DENOM),
+                }
+                .into(),
+                gas_limit: None,
+            },
+            Action {
+                msg: WasmMsg::Execute {
+                    contract_addr: cw20_addr.to_string(),
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: "bob".to_owned(),
+                        amount: Uint128::new(100),
+                    })?,
+                    funds: vec![],
+                }
+                .into(),
+                gas_limit: Some(120),
+            },
+        ],
         queries: None,
         transforms: None,
-        cw20: None,
+        cw20: cw20_amount.clone(),
     };
 
     // TODO: MAKE IT COMPILE LOL
-    // let exec_msg = app::msg::ExecuteMsg {
-    //     base: BaseExecuteMsg::UpdateConfig {
-    //         ans_host_address: None,
-    //     },
-    //     module: AppExecuteMsg::CreateTask {
-    //         task: Box::new(task),
-    //         funds: coins(45_000, DENOM),
-    //     },
+    // let execute_msg = app::msg::AppExecuteMsg::CreateTask {
+    //     task: Box::new(task),
+    //     funds: coins(45_000, DENOM),
+    //     cw20_funds: cw20_amount
     // };
     // account
     //     .manager
     //     .exec_on_module(to_binary(&execute_msg)?, CRONCAT_ID.to_owned())?;
 
-    contract.create_task(coins(45_000, DENOM), Box::new(task), None)?;
+    contract
+        .create_task(coins(45_000, DENOM), Box::new(task), cw20_amount)
+        .unwrap();
     Ok(())
 }

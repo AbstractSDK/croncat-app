@@ -38,3 +38,12 @@ pub(crate) fn croncat_agents_contract() -> Box<dyn Contract<Empty>> {
     );
     Box::new(contract)
 }
+
+pub(crate) fn cw20_contract() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(
+        cw20_base::contract::execute,
+        cw20_base::contract::instantiate,
+        cw20_base::contract::query,
+    );
+    Box::new(contract)
+}

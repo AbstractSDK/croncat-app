@@ -42,7 +42,7 @@ schema = ["abstract-app/schema"]
 cosmwasm-std = { version = "1.2" }
 cosmwasm-schema = { version = "1.2" }
 cw-utils = { version = "1.0.1" }
-cw20 = { version = "1.0.1" }
+cw20 = { version = "0.16.0" }
 
 cw-controllers = { version = "1.0.1" }
 cw-storage-plus = "1.0.1"
@@ -61,6 +61,7 @@ cw-orch = { version = "0.12", optional = true }
 # Croncat dependencies
 croncat-sdk-factory = "1.0.3"
 croncat-sdk-tasks = "1.0.3"
+croncat-sdk-manager = "1.0.3"
 
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }
@@ -75,11 +76,12 @@ cw-orch = { version = "0.12", features = ["daemon"] }
 cw-multi-test = "0.16.4"
 
 # Croncat intefraces
-croncat-sdk-tasks = "1.0.3"
-croncat-sdk-manager = "1.0.3"
 croncat-sdk-agents = "1.0.3"
 # Croncat contracts
 croncat-factory = "1.0.3"
 croncat-tasks = "1.0.3"
 croncat-manager = "1.0.3"
 croncat-agents = "1.0.3"
+
+# Testing cw20
+cw20-base = "0.16.0"

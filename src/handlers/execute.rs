@@ -64,7 +64,7 @@ fn create_task(
     let config = CONFIG.load(deps.storage)?;
     let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
         deps.querier.query_wasm_smart(
-            config.factory_addr,
+            config.factory_addr.clone(),
             &FactoryQueryMsg::LatestContract {
                 contract_name: "tasks".to_owned(),
             },
@@ -79,11 +79,23 @@ fn create_task(
     let funds_msgs = if let Some(cw20) = cw20_funds {
         let info = AssetInfo::Cw20(deps.api.addr_validate(&cw20.address)?);
         let asset = Asset::new(info, cw20.amount);
+        let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
+            deps.querier.query_wasm_smart(
+                config.factory_addr,
+                &FactoryQueryMsg::LatestContract {
+                    contract_name: "manager".to_owned(),
+                },
+            )?;
+        let manager_addr = metadata_res
+            .metadata
+            .ok_or(AppError::UnknownVersion {})?
+            .contract_addr;
         let cw20_transfer = WasmMsg::Execute {
             contract_addr: cw20.address,
-            msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                recipient: tasks_addr.to_string(),
+            msg: to_binary(&Cw20ExecuteMsg::Send {
+                contract: manager_addr.to_string(),
                 amount: cw20.amount,
+                msg: to_binary(&croncat_sdk_manager::msg::ManagerReceiveMsg::RefillTempBalance {})?,
             })?,
             funds: vec![],
         };
