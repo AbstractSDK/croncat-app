@@ -3,6 +3,7 @@ use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, 
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::Coin;
 use croncat_sdk_tasks::types::TaskRequest;
+use cw20::Cw20Coin;
 
 use crate::{contract::CroncatApp, state::Config};
 
@@ -32,6 +33,7 @@ pub enum AppExecuteMsg {
     CreateTask {
         task: Box<TaskRequest>,
         funds: Vec<Coin>,
+        cw20_funds: Option<Cw20Coin>,
     },
 }
 

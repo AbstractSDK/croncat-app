@@ -261,6 +261,6 @@ fn successful_install() -> anyhow::Result<()> {
     //     .manager
     //     .exec_on_module(to_binary(&execute_msg)?, CRONCAT_ID.to_owned())?;
 
-    contract.create_task(coins(45_000, DENOM), Box::new(task))?;
+    contract.create_task(coins(45_000, DENOM), Box::new(task), None)?;
     Ok(())
 }

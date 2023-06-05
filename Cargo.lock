@@ -337,6 +337,7 @@ dependencies = [
  "cw-orch",
  "cw-storage-plus 1.0.1",
  "cw-utils 1.0.1",
+ "cw20 1.0.1",
  "dotenv",
  "env_logger",
  "schemars",
