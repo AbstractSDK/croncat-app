@@ -35,6 +35,9 @@ pub enum AppExecuteMsg {
         funds: Vec<Coin>,
         cw20_funds: Option<Cw20Coin>,
     },
+    RemoveTask {
+        task_hash: String,
+    }
 }
 
 #[cosmwasm_schema::cw_serde]
@@ -44,6 +47,8 @@ pub enum AppExecuteMsg {
 pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
+    #[returns(Vec<String>)]
+    ActiveTasks {},
 }
 
 #[cosmwasm_schema::cw_serde]

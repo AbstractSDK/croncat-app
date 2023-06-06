@@ -14,11 +14,12 @@ pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply
     let task: TaskExecutionInfo = from_binary(&execute_data.data.unwrap())?;
     ACTIVE_TASKS.update(
         deps.storage,
-        &task.version,
-        |task_hashes| -> Result<_, AppError> {
-            let mut task_hashes = task_hashes.unwrap_or_default();
-            task_hashes.push(task.task_hash.as_bytes().to_owned());
-            Ok(task_hashes)
+        &task.task_hash,
+        |task_version| match task_version {
+            Some(_) => Err(AppError::TaskAlreadyExists {
+                task_hash: task.task_hash.clone(),
+            }),
+            None => Ok(task.version),
         },
     )?;
     Ok(app.tag_response(

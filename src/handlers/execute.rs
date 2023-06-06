@@ -12,7 +12,7 @@ use crate::contract::{CroncatApp, CroncatResult};
 use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
 use crate::replies::TASK_CREATE_REPLY_ID;
-use crate::state::{Config, CONFIG};
+use crate::state::{Config, ACTIVE_TASKS, CONFIG};
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -30,6 +30,7 @@ pub fn execute_handler(
             funds,
             cw20_funds,
         } => create_task(deps.as_ref(), env, info, app, task, funds, cw20_funds),
+        AppExecuteMsg::RemoveTask { task_hash } => remove_task(deps, app, task_hash),
     }
 }
 
@@ -125,4 +126,32 @@ fn create_task(
         .add_messages(funds_msgs)
         .add_submessage(create_task_submsg);
     Ok(app.tag_response(response, "create_task"))
+}
+
+/// Remove a task
+fn remove_task(deps: DepsMut, app: CroncatApp, task_hash: String) -> CroncatResult {
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+    let config = CONFIG.load(deps.storage)?;
+    // TODO: create helper on factory
+    let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
+        .query(
+            &deps.querier,
+            config.factory_addr,
+            (
+                "tasks",
+                &task_version
+                    .split(".")
+                    .map(|num| num.parse::<u8>().unwrap())
+                    .collect::<Vec<u8>>(),
+            ),
+        )?
+        .unwrap();
+    ACTIVE_TASKS.remove(deps.storage, &task_hash);
+
+    let remove_task_msg = WasmMsg::Execute {
+        contract_addr: tasks_addr.into_string(),
+        msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
+        funds: vec![],
+    };
+    Ok(app.tag_response(Response::new().add_message(remove_task_msg), "remove_task"))
 }

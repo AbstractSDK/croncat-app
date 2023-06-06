@@ -7,8 +7,8 @@ use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
-    msg::{AppInstantiateMsg, InstantiateMsg},
-    App, AppExecuteMsgFns,
+    msg::{AppInstantiateMsg, AppQueryMsg, InstantiateMsg},
+    App, AppExecuteMsgFns, AppQueryMsgFns,
 };
 use common::contracts;
 
@@ -284,5 +284,13 @@ fn successful_task_creation() -> anyhow::Result<()> {
     contract
         .create_task(coins(45_000, DENOM), Box::new(task), cw20_amount)
         .unwrap();
+
+    let active_tasks: Vec<String> = contract.active_tasks()?;
+    assert_eq!(active_tasks.len(), 1);
+
+    contract.remove_task(active_tasks[0].clone())?;
+
+    let active_tasks: Vec<String> = contract.active_tasks()?;
+    assert_eq!(active_tasks.len(), 0);
     Ok(())
 }

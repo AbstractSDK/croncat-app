@@ -62,6 +62,8 @@ cw-orch = { version = "0.12", optional = true }
 croncat-sdk-factory = "1.0.3"
 croncat-sdk-tasks = "1.0.3"
 croncat-sdk-manager = "1.0.3"
+# TODO: avoid using contract dep
+croncat-factory = { version = "1.0.3", features = ["library"]}
 
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }
