@@ -34,7 +34,5 @@ pub enum AppError {
     UnknownVersion {},
 
     #[error("Task already exists {task_hash}")]
-    TaskAlreadyExists {
-        task_hash: String
-    },
+    TaskAlreadyExists { task_hash: String },
 }

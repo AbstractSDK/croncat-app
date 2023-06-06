@@ -37,7 +37,7 @@ pub enum AppExecuteMsg {
     },
     RemoveTask {
         task_hash: String,
-    }
+    },
 }
 
 #[cosmwasm_schema::cw_serde]

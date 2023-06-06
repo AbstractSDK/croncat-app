@@ -7,7 +7,7 @@ use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
-    msg::{AppInstantiateMsg, AppQueryMsg, InstantiateMsg},
+    msg::{AppInstantiateMsg, InstantiateMsg},
     App, AppExecuteMsgFns, AppQueryMsgFns,
 };
 use common::contracts;

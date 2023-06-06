@@ -140,7 +140,7 @@ fn remove_task(deps: DepsMut, app: CroncatApp, task_hash: String) -> CroncatResu
             (
                 "tasks",
                 &task_version
-                    .split(".")
+                    .split('.')
                     .map(|num| num.parse::<u8>().unwrap())
                     .collect::<Vec<u8>>(),
             ),
