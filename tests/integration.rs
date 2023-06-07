@@ -15,7 +15,7 @@ use common::contracts;
 use croncat_integration_utils::{AGENTS_NAME, MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;
 use croncat_sdk_factory::msg::{FactoryInstantiateMsg, ModuleInstantiateInfo, VersionKind};
-use croncat_sdk_manager::msg::ManagerInstantiateMsg;
+use croncat_sdk_manager::{msg::ManagerInstantiateMsg, types::TaskBalance};
 use croncat_sdk_tasks::{
     msg::TasksInstantiateMsg,
     types::{Action, TaskRequest},
@@ -51,7 +51,7 @@ fn setup_croncat_contracts(
             decimals: 6,
             initial_balances: vec![Cw20Coin {
                 address: proxy_addr,
-                amount: Uint128::new(100),
+                amount: Uint128::new(105),
             }],
             mint: None,
             marketing: None,
@@ -289,7 +289,30 @@ fn successful_task_creation() -> anyhow::Result<()> {
     let active_tasks: Vec<String> = contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 1);
 
-    contract.refill_task(coins(100, DENOM), active_tasks[0].clone(), None)?;
+    let task_balance1: TaskBalance = contract
+        .task_balance(active_tasks[0].clone())?
+        .balance
+        .unwrap();
+    contract.refill_task(
+        coins(100, DENOM),
+        active_tasks[0].clone(),
+        Some(Cw20Coin {
+            address: cw20_addr.to_string(),
+            amount: Uint128::new(5),
+        }),
+    )?;
+    let task_balance2: TaskBalance = contract
+        .task_balance(active_tasks[0].clone())?
+        .balance
+        .unwrap();
+    assert_eq!(
+        task_balance2.native_balance,
+        task_balance1.native_balance + Uint128::new(100)
+    );
+    assert_eq!(
+        task_balance2.cw20_balance.unwrap().amount,
+        task_balance1.cw20_balance.unwrap().amount + Uint128::new(5)
+    );
 
     contract.remove_task(active_tasks[0].clone())?;
 
