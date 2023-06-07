@@ -289,6 +289,8 @@ fn successful_task_creation() -> anyhow::Result<()> {
     let active_tasks: Vec<String> = contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 1);
 
+    contract.refill_task(coins(100, DENOM), active_tasks[0].clone(), None)?;
+
     contract.remove_task(active_tasks[0].clone())?;
 
     let active_tasks: Vec<String> = contract.active_tasks()?;

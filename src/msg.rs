@@ -38,6 +38,11 @@ pub enum AppExecuteMsg {
     RemoveTask {
         task_hash: String,
     },
+    RefillTask {
+        task_hash: String,
+        funds: Vec<Coin>,
+        cw20_funds: Option<Cw20Coin>,
+    }
 }
 
 #[cosmwasm_schema::cw_serde]

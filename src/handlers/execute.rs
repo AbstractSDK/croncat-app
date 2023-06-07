@@ -3,8 +3,9 @@ use abstract_sdk::{Execution, TransferInterface};
 use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, SubMsg, WasmMsg};
 use croncat_integration_utils::task_creation::get_latest_croncat_contract;
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
-use croncat_sdk_tasks::msg::TasksExecuteMsg;
-use croncat_sdk_tasks::types::TaskRequest;
+use croncat_sdk_manager::msg::ManagerExecuteMsg;
+use croncat_sdk_tasks::msg::{TasksExecuteMsg, TasksQueryMsg};
+use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
 use cw20::{Cw20Coin, Cw20ExecuteMsg};
 use cw_asset::{Asset, AssetInfo};
 
@@ -30,7 +31,12 @@ pub fn execute_handler(
             funds,
             cw20_funds,
         } => create_task(deps.as_ref(), env, info, app, task, funds, cw20_funds),
-        AppExecuteMsg::RemoveTask { task_hash } => remove_task(deps, app, task_hash),
+        AppExecuteMsg::RemoveTask { task_hash } => remove_task(deps, info, app, task_hash),
+        AppExecuteMsg::RefillTask {
+            task_hash,
+            funds,
+            cw20_funds,
+        } => refill_task(deps.as_ref(), env, info, app, task_hash, funds, cw20_funds),
     }
 }
 
@@ -118,9 +124,16 @@ fn create_task(
 }
 
 /// Remove a task
-fn remove_task(deps: DepsMut, app: CroncatApp, task_hash: String) -> CroncatResult {
-    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+fn remove_task(
+    deps: DepsMut,
+    msg_info: MessageInfo,
+    app: CroncatApp,
+    task_hash: String,
+) -> CroncatResult {
+    app.admin.assert_admin(deps.as_ref(), &msg_info.sender)?;
+
     let config = CONFIG.load(deps.storage)?;
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     // TODO: create helper on factory
     let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
@@ -137,10 +150,96 @@ fn remove_task(deps: DepsMut, app: CroncatApp, task_hash: String) -> CroncatResu
         .unwrap();
     ACTIVE_TASKS.remove(deps.storage, &task_hash);
 
-    let remove_task_msg = WasmMsg::Execute {
-        contract_addr: tasks_addr.into_string(),
-        msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
-        funds: vec![],
+    let response = {
+        let task_response: TaskResponse = deps.querier.query_wasm_smart(
+            tasks_addr.to_string(),
+            &TasksQueryMsg::Task {
+                task_hash: task_hash.clone(),
+            },
+        )?;
+        if task_response.task.is_some() {
+            let remove_task_msg = WasmMsg::Execute {
+                contract_addr: tasks_addr.into_string(),
+                msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
+                funds: vec![],
+            };
+            Response::new().add_message(remove_task_msg)
+        } else {
+            Response::new()
+        }
     };
-    Ok(app.tag_response(Response::new().add_message(remove_task_msg), "remove_task"))
+    Ok(app.tag_response(response, "remove_task"))
+}
+
+/// Refill a task
+fn refill_task(
+    deps: Deps,
+    env: Env,
+    msg_info: MessageInfo,
+    app: CroncatApp,
+    task_hash: String,
+    funds: Vec<Coin>,
+    cw20_funds: Option<Cw20Coin>,
+) -> CroncatResult {
+    app.admin.assert_admin(deps, &msg_info.sender)?;
+
+    let config = CONFIG.load(deps.storage)?;
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+
+    // TODO: create helper on factory
+    let manager_addr = croncat_factory::state::CONTRACT_ADDRS
+        .query(
+            &deps.querier,
+            config.factory_addr,
+            (
+                MANAGER_NAME,
+                &task_version
+                    .split('.')
+                    .map(|num| num.parse::<u8>().unwrap())
+                    .collect::<Vec<u8>>(),
+            ),
+        )?
+        .unwrap();
+    let bank = app.bank(deps);
+    let messages = if let Some(cw20) = cw20_funds {
+        let info = AssetInfo::Cw20(deps.api.addr_validate(&cw20.address)?);
+        let asset = Asset::new(info, cw20.amount);
+
+        let cw20_transfer = WasmMsg::Execute {
+            contract_addr: cw20.address,
+            msg: to_binary(&Cw20ExecuteMsg::Send {
+                contract: manager_addr.to_string(),
+                amount: cw20.amount,
+                msg: to_binary(
+                    &croncat_sdk_manager::msg::ManagerReceiveMsg::RefillTaskBalance {
+                        task_hash: task_hash.clone(),
+                    },
+                )?,
+            })?,
+            funds: vec![],
+        };
+        let bank_actions = vec![
+            bank.withdraw(&env, funds.clone())?,
+            bank.withdraw(&env, vec![asset])?,
+        ];
+        vec![
+            app.executor(deps).execute(bank_actions)?,
+            cw20_transfer.into(),
+        ]
+    } else {
+        let bank_actions = vec![bank.withdraw(&env, funds.clone())?];
+        vec![app.executor(deps).execute(bank_actions)?]
+    };
+
+    let response = Response::default().add_messages(messages);
+    if funds.is_empty() {
+        Ok(app.tag_response(response, "refill_task"))
+    } else {
+        let refill_task_msg = WasmMsg::Execute {
+            contract_addr: manager_addr.to_string(),
+            msg: to_binary(&ManagerExecuteMsg::RefillTaskBalance { task_hash })?,
+            funds,
+        };
+        Ok(app.tag_response(response.add_message(refill_task_msg), "refill_task"))
+    }
 }
