@@ -1,7 +1,8 @@
 use abstract_sdk::features::AbstractResponse;
 use abstract_sdk::{Execution, TransferInterface};
 use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, SubMsg, WasmMsg};
-use croncat_sdk_factory::msg::FactoryQueryMsg;
+use croncat_integration_utils::task_creation::get_latest_croncat_contract;
+use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_tasks::msg::TasksExecuteMsg;
 use croncat_sdk_tasks::types::TaskRequest;
 use cw20::{Cw20Coin, Cw20ExecuteMsg};
@@ -9,7 +10,6 @@ use cw_asset::{Asset, AssetInfo};
 
 use crate::contract::{CroncatApp, CroncatResult};
 
-use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
 use crate::replies::TASK_CREATE_REPLY_ID;
 use crate::state::{Config, ACTIVE_TASKS, CONFIG};
@@ -63,34 +63,23 @@ fn create_task(
     app.admin.assert_admin(deps, &msg_info.sender)?;
 
     let config = CONFIG.load(deps.storage)?;
-    let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
-        deps.querier.query_wasm_smart(
-            config.factory_addr.clone(),
-            &FactoryQueryMsg::LatestContract {
-                contract_name: "tasks".to_owned(),
-            },
-        )?;
-    let tasks_addr = metadata_res
-        .metadata
-        .ok_or(AppError::UnknownVersion {})?
-        .contract_addr;
+
+    let tasks_addr = get_latest_croncat_contract(
+        &deps.querier,
+        config.factory_addr.clone(),
+        TASKS_NAME.to_owned(),
+    )?;
 
     // Withdraw funds
     let bank = app.bank(deps);
     let funds_msgs = if let Some(cw20) = cw20_funds {
         let info = AssetInfo::Cw20(deps.api.addr_validate(&cw20.address)?);
         let asset = Asset::new(info, cw20.amount);
-        let metadata_res: croncat_sdk_factory::msg::ContractMetadataResponse =
-            deps.querier.query_wasm_smart(
-                config.factory_addr,
-                &FactoryQueryMsg::LatestContract {
-                    contract_name: "manager".to_owned(),
-                },
-            )?;
-        let manager_addr = metadata_res
-            .metadata
-            .ok_or(AppError::UnknownVersion {})?
-            .contract_addr;
+        let manager_addr = get_latest_croncat_contract(
+            &deps.querier,
+            config.factory_addr,
+            MANAGER_NAME.to_owned(),
+        )?;
         let cw20_transfer = WasmMsg::Execute {
             contract_addr: cw20.address,
             msg: to_binary(&Cw20ExecuteMsg::Send {
@@ -138,7 +127,7 @@ fn remove_task(deps: DepsMut, app: CroncatApp, task_hash: String) -> CroncatResu
             &deps.querier,
             config.factory_addr,
             (
-                "tasks",
+                TASKS_NAME,
                 &task_version
                     .split('.')
                     .map(|num| num.parse::<u8>().unwrap())

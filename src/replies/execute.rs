@@ -5,13 +5,11 @@ use crate::{
 };
 
 use abstract_sdk::features::AbstractResponse;
-use cosmwasm_std::{from_binary, DepsMut, Env, Reply, Response};
-use croncat_sdk_tasks::types::TaskExecutionInfo;
-use cw_utils::parse_reply_execute_data;
+use cosmwasm_std::{DepsMut, Env, Reply, Response};
+use croncat_integration_utils::reply_handler::reply_handle_croncat_task_creation;
 
 pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply) -> CroncatResult {
-    let execute_data = parse_reply_execute_data(reply)?;
-    let task: TaskExecutionInfo = from_binary(&execute_data.data.unwrap())?;
+    let (task, _bin) = reply_handle_croncat_task_creation(reply)?;
     ACTIVE_TASKS.update(
         deps.storage,
         &task.task_hash,

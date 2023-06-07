@@ -12,6 +12,7 @@ use app::{
 };
 use common::contracts;
 
+use croncat_integration_utils::{AGENTS_NAME, MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;
 use croncat_sdk_factory::msg::{FactoryInstantiateMsg, ModuleInstantiateInfo, VersionKind};
 use croncat_sdk_manager::msg::ManagerInstantiateMsg;
@@ -76,8 +77,8 @@ fn setup_croncat_contracts(
     let code_id = app.store_code(contracts::croncat_manager_contract());
     let msg = ManagerInstantiateMsg {
         version: Some("1.0".to_owned()),
-        croncat_tasks_key: ("tasks".to_owned(), [1, 0]),
-        croncat_agents_key: ("agents".to_owned(), [1, 0]),
+        croncat_tasks_key: (TASKS_NAME.to_owned(), [1, 0]),
+        croncat_agents_key: (AGENTS_NAME.to_owned(), [1, 0]),
         pause_admin: pause_admin.clone(),
         gas_price: None,
         treasury_addr: None,
@@ -91,7 +92,7 @@ fn setup_croncat_contracts(
         changelog_url: None,
         schema: None,
         msg: to_binary(&msg).unwrap(),
-        contract_name: "manager".to_owned(),
+        contract_name: MANAGER_NAME.to_owned(),
     };
     app.execute_contract(
         sender.clone(),
@@ -111,8 +112,8 @@ fn setup_croncat_contracts(
     let code_id = app.store_code(contracts::croncat_agents_contract());
     let msg = AgentsInstantiateMsg {
         version: Some(VERSION.to_owned()),
-        croncat_manager_key: ("manager".to_owned(), [1, 0]),
-        croncat_tasks_key: ("tasks".to_owned(), [1, 0]),
+        croncat_manager_key: (MANAGER_NAME.to_owned(), [1, 0]),
+        croncat_tasks_key: (TASKS_NAME.to_owned(), [1, 0]),
         pause_admin: pause_admin.clone(),
         agent_nomination_duration: None,
         min_tasks_per_agent: None,
@@ -130,7 +131,7 @@ fn setup_croncat_contracts(
         changelog_url: None,
         schema: None,
         msg: to_binary(&msg).unwrap(),
-        contract_name: "agents".to_owned(),
+        contract_name: AGENTS_NAME.to_owned(),
     };
     app.execute_contract(
         sender.clone(),
@@ -149,8 +150,8 @@ fn setup_croncat_contracts(
         version: Some(VERSION.to_owned()),
         chain_name: "atom".to_owned(),
         pause_admin,
-        croncat_manager_key: ("manager".to_owned(), [1, 0]),
-        croncat_agents_key: ("agents".to_owned(), [1, 0]),
+        croncat_manager_key: (MANAGER_NAME.to_owned(), [1, 0]),
+        croncat_agents_key: (AGENTS_NAME.to_owned(), [1, 0]),
         slot_granularity_time: None,
         gas_base_fee: None,
         gas_action_fee: None,
@@ -165,7 +166,7 @@ fn setup_croncat_contracts(
         changelog_url: None,
         schema: None,
         msg: to_binary(&msg).unwrap(),
-        contract_name: "tasks".to_owned(),
+        contract_name: TASKS_NAME.to_owned(),
     };
     app.execute_contract(
         sender,

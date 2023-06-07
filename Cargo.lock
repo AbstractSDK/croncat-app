@@ -325,6 +325,8 @@ dependencies = [
  "cosmwasm-std",
  "croncat-agents",
  "croncat-factory",
+ "croncat-integration-testing",
+ "croncat-integration-utils",
  "croncat-manager",
  "croncat-sdk-agents",
  "croncat-sdk-factory",
@@ -336,7 +338,6 @@ dependencies = [
  "cw-multi-test",
  "cw-orch",
  "cw-storage-plus 1.0.1",
- "cw-utils 1.0.1",
  "cw20 0.16.0",
  "cw20-base 0.16.0",
  "dotenv",
@@ -800,6 +801,50 @@ dependencies = [
  "cw-storage-plus 1.0.1",
  "cw-utils 0.16.0",
  "cw2 1.0.1",
+ "thiserror",
+]
+
+[[package]]
+name = "croncat-integration-testing"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67baa56a1d711433d6502c44b37c82c32b50b365467cff3d0594eb722402370a"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "croncat-agents",
+ "croncat-factory",
+ "croncat-manager",
+ "croncat-sdk-agents",
+ "croncat-sdk-factory",
+ "croncat-sdk-manager",
+ "croncat-sdk-tasks",
+ "croncat-tasks",
+ "cw-multi-test",
+ "cw-utils 0.16.0",
+ "cw20 0.16.0",
+ "serde-json-wasm",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "croncat-integration-utils"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2221b958f152e06ea09eb4fea53010470bd3462d77664e6c48de6a37ff34ecd"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "croncat-mod-generic",
+ "croncat-sdk-agents",
+ "croncat-sdk-factory",
+ "croncat-sdk-manager",
+ "croncat-sdk-tasks",
+ "cw-utils 0.16.0",
+ "cw20 0.16.0",
+ "serde-json-wasm",
+ "serde_json",
  "thiserror",
 ]
 
