@@ -44,6 +44,7 @@ pub enum AppExecuteMsg {
         funds: Vec<Coin>,
         cw20_funds: Option<Cw20Coin>,
     },
+    MoveFunds {},
 }
 
 #[cosmwasm_schema::cw_serde]

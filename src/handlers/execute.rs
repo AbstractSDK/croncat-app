@@ -37,6 +37,7 @@ pub fn execute_handler(
             funds,
             cw20_funds,
         } => refill_task(deps.as_ref(), env, info, app, task_hash, funds, cw20_funds),
+        AppExecuteMsg::MoveFunds {} => move_funds(deps.as_ref(), env, info, app),
     }
 }
 
@@ -242,4 +243,15 @@ fn refill_task(
         };
         Ok(app.tag_response(response.add_message(refill_task_msg), "refill_task"))
     }
+}
+
+/// Move funds
+/// Moves funds from module to the account contract
+fn move_funds(deps: Deps, env: Env, msg_info: MessageInfo, app: CroncatApp) -> CroncatResult {
+    // TODO: do we care if it's called by admin?
+    app.admin.assert_admin(deps, &msg_info.sender)?;
+
+    let funds = deps.querier.query_all_balances(env.contract.address)?;
+    let move_funds_msg = app.bank(deps).deposit(funds)?.messages().pop().unwrap();
+    Ok(app.tag_response(Response::new().add_message(move_funds_msg), "move_funds"))
 }

@@ -182,8 +182,16 @@ fn setup_croncat_contracts(
     Ok((factory_addr, cw20_addr))
 }
 
+struct TestingSetup {
+    account: AbstractAccount<Mock>,
+    abstr_deployment: Abstract<Mock>,
+    module_contract: App<Mock>,
+    cw20_addr: Addr,
+    mock: Mock,
+}
+
 /// Set up the test environment with the contract installed
-fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>, Addr)> {
+fn setup() -> anyhow::Result<TestingSetup> {
     // Create a sender
     let sender = Addr::unchecked(ADMIN);
     // Create the mock
@@ -229,13 +237,24 @@ fn setup() -> anyhow::Result<(AbstractAccount<Mock>, Abstract<Mock>, App<Mock>, 
     contract.set_sender(&manager_addr);
     mock.set_balance(&account.proxy.address()?, coins(50_000, DENOM))?;
 
-    Ok((account, abstr_deployment, contract, cw20_addr))
+    Ok(TestingSetup {
+        account,
+        abstr_deployment,
+        module_contract: contract,
+        cw20_addr,
+        mock,
+    })
 }
 
 #[test]
 fn successful_task_creation() -> anyhow::Result<()> {
     // Set up the environment and contract
-    let (_account, _abstr, contract, cw20_addr) = setup()?;
+    let TestingSetup {
+        module_contract,
+        cw20_addr,
+        mock,
+        ..
+    } = setup()?;
 
     let cw20_amount = Some(Cw20Coin {
         address: cw20_addr.to_string(),
@@ -272,28 +291,18 @@ fn successful_task_creation() -> anyhow::Result<()> {
         cw20: cw20_amount.clone(),
     };
 
-    // TODO: MAKE IT COMPILE LOL
-    // let execute_msg = app::msg::AppExecuteMsg::CreateTask {
-    //     task: Box::new(task),
-    //     funds: coins(45_000, DENOM),
-    //     cw20_funds: cw20_amount
-    // };
-    // account
-    //     .manager
-    //     .exec_on_module(to_binary(&execute_msg)?, CRONCAT_ID.to_owned())?;
-
-    contract
+    module_contract
         .create_task(coins(45_000, DENOM), Box::new(task), cw20_amount)
         .unwrap();
 
-    let active_tasks: Vec<String> = contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 1);
 
-    let task_balance1: TaskBalance = contract
+    let task_balance1: TaskBalance = module_contract
         .task_balance(active_tasks[0].clone())?
         .balance
         .unwrap();
-    contract.refill_task(
+    module_contract.refill_task(
         coins(100, DENOM),
         active_tasks[0].clone(),
         Some(Cw20Coin {
@@ -301,7 +310,7 @@ fn successful_task_creation() -> anyhow::Result<()> {
             amount: Uint128::new(5),
         }),
     )?;
-    let task_balance2: TaskBalance = contract
+    let task_balance2: TaskBalance = module_contract
         .task_balance(active_tasks[0].clone())?
         .balance
         .unwrap();
@@ -314,9 +323,19 @@ fn successful_task_creation() -> anyhow::Result<()> {
         task_balance1.cw20_balance.unwrap().amount + Uint128::new(5)
     );
 
-    contract.remove_task(active_tasks[0].clone())?;
+    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert!(manager_balance.is_zero());
 
-    let active_tasks: Vec<String> = contract.active_tasks()?;
+    module_contract.remove_task(active_tasks[0].clone())?;
+
+    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert_eq!(manager_balance, Uint128::new(45_000 + 100));
+
+    module_contract.move_funds()?;
+    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert!(manager_balance.is_zero());
+
+    let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 0);
     Ok(())
 }
