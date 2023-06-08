@@ -1,6 +1,8 @@
 use abstract_sdk::features::AbstractResponse;
 use abstract_sdk::{Execution, TransferInterface};
-use cosmwasm_std::{to_binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, SubMsg, WasmMsg};
+use cosmwasm_std::{
+    to_binary, Addr, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response, SubMsg, WasmMsg,
+};
 use croncat_integration_utils::task_creation::get_latest_croncat_contract;
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
@@ -11,9 +13,10 @@ use cw_asset::{Asset, AssetInfo};
 
 use crate::contract::{CroncatApp, CroncatResult};
 
+use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
 use crate::replies::TASK_CREATE_REPLY_ID;
-use crate::state::{Config, ACTIVE_TASKS, CONFIG};
+use crate::state::{Config, ACTIVE_TASKS, CONFIG, TASKS_WITH_CW20};
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -38,6 +41,7 @@ pub fn execute_handler(
             cw20_funds,
         } => refill_task(deps.as_ref(), env, info, app, task_hash, funds, cw20_funds),
         AppExecuteMsg::MoveFunds {} => move_funds(deps.as_ref(), env, info, app),
+        AppExecuteMsg::Tick { .. } => todo!(),
     }
 }
 
@@ -124,6 +128,33 @@ fn create_task(
     Ok(app.tag_response(response, "create_task"))
 }
 
+fn local_remove_task(
+    deps: DepsMut,
+    task_version: &str,
+    task_hash: &str,
+    tasks_addr: &Addr,
+) -> Result<TaskResponse, AppError> {
+    ACTIVE_TASKS.remove(deps.storage, task_hash);
+    // ACTIVE_VERSIONS.update(deps.storage, task_version, |active_tasks| {
+    //     let mut active_tasks = active_tasks.unwrap();
+    //     active_tasks.retain(|v| v == task_hash);
+    //     CroncatResult::Ok(active_tasks)
+    // })?;
+
+    let task_response: TaskResponse = deps.querier.query_wasm_smart(
+        tasks_addr.to_string(),
+        &TasksQueryMsg::Task {
+            task_hash: task_hash.to_owned(),
+        },
+    )?;
+    if let Some(task) = &task_response.task {
+        if task.amount_for_one_task.cw20.is_some() {
+            TASKS_WITH_CW20.save(deps.storage, task_version, &Empty {})?;
+        }
+    }
+    Ok(task_response)
+}
+
 /// Remove a task
 fn remove_task(
     deps: DepsMut,
@@ -135,6 +166,7 @@ fn remove_task(
 
     let config = CONFIG.load(deps.storage)?;
     let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+
     // TODO: create helper on factory
     let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
@@ -149,25 +181,17 @@ fn remove_task(
             ),
         )?
         .unwrap();
-    ACTIVE_TASKS.remove(deps.storage, &task_hash);
+    let task_response = local_remove_task(deps, &task_version, &task_hash, &tasks_addr)?;
 
-    let response = {
-        let task_response: TaskResponse = deps.querier.query_wasm_smart(
-            tasks_addr.to_string(),
-            &TasksQueryMsg::Task {
-                task_hash: task_hash.clone(),
-            },
-        )?;
-        if task_response.task.is_some() {
-            let remove_task_msg = WasmMsg::Execute {
-                contract_addr: tasks_addr.into_string(),
-                msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
-                funds: vec![],
-            };
-            Response::new().add_message(remove_task_msg)
-        } else {
-            Response::new()
-        }
+    let response = if task_response.task.is_some() {
+        let remove_task_msg = WasmMsg::Execute {
+            contract_addr: tasks_addr.into_string(),
+            msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
+            funds: vec![],
+        };
+        Response::new().add_message(remove_task_msg)
+    } else {
+        Response::new()
     };
     Ok(app.tag_response(response, "remove_task"))
 }
@@ -248,10 +272,14 @@ fn refill_task(
 /// Move funds
 /// Moves funds from module to the account contract
 fn move_funds(deps: Deps, env: Env, msg_info: MessageInfo, app: CroncatApp) -> CroncatResult {
-    // TODO: do we care if it's called by admin?
+    // TODO: do we care if it's called not by admin?
     app.admin.assert_admin(deps, &msg_info.sender)?;
 
     let funds = deps.querier.query_all_balances(env.contract.address)?;
     let move_funds_msg = app.bank(deps).deposit(funds)?.messages().pop().unwrap();
     Ok(app.tag_response(Response::new().add_message(move_funds_msg), "move_funds"))
 }
+
+// fn tick(deps: DepsMut, env: Env, app: CroncatApp, auto_withdraw: bool) -> CroncatResult {
+//     Ok(app.tag_response(Response::new(), "tick"))
+// }

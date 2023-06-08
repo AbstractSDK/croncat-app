@@ -247,7 +247,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
 }
 
 #[test]
-fn successful_task_creation() -> anyhow::Result<()> {
+fn rapid_testing() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
         module_contract,

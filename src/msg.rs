@@ -45,6 +45,9 @@ pub enum AppExecuteMsg {
         cw20_funds: Option<Cw20Coin>,
     },
     MoveFunds {},
+    Tick {
+        auto_withdraw: bool,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]
