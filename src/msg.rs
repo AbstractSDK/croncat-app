@@ -2,8 +2,7 @@ use abstract_core::app;
 use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::Coin;
-use croncat_sdk_manager::types::TaskBalanceResponse;
-use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
+use croncat_integration_utils::CronCatTaskRequest;
 use cw20::Cw20Coin;
 
 use crate::{contract::CroncatApp, state::Config};
@@ -32,7 +31,7 @@ pub enum AppExecuteMsg {
         factory_addr: String,
     },
     CreateTask {
-        task: Box<TaskRequest>,
+        task: Box<CronCatTaskRequest>,
         funds: Vec<Coin>,
         cw20_funds: Option<Cw20Coin>,
     },
@@ -59,9 +58,9 @@ pub enum AppQueryMsg {
     Config {},
     #[returns(Vec<String>)]
     ActiveTasks {},
-    #[returns(TaskResponse)]
+    #[returns(croncat_sdk_tasks::types::TaskResponse)]
     TaskInfo { task_hash: String },
-    #[returns(TaskBalanceResponse)]
+    #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]
     TaskBalance { task_hash: String },
 }
 

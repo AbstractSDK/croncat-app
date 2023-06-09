@@ -21,7 +21,7 @@ use croncat_sdk_tasks::{
     types::{Action, TaskRequest},
 };
 
-use cw20::{Cw20Coin, Cw20ExecuteMsg};
+use cw20::{Cw20Coin, Cw20ExecuteMsg, Cw20QueryMsg};
 use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
@@ -184,6 +184,7 @@ fn setup_croncat_contracts(
 
 struct TestingSetup {
     account: AbstractAccount<Mock>,
+    #[allow(unused)]
     abstr_deployment: Abstract<Mock>,
     module_contract: App<Mock>,
     cw20_addr: Addr,
@@ -250,6 +251,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
 fn rapid_testing() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
+        account,
         module_contract,
         cw20_addr,
         mock,
@@ -291,13 +293,14 @@ fn rapid_testing() -> anyhow::Result<()> {
         cw20: cw20_amount.clone(),
     };
 
+    // Task creation
     module_contract
         .create_task(coins(45_000, DENOM), Box::new(task), cw20_amount)
         .unwrap();
-
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 1);
 
+    // Refilling task
     let task_balance1: TaskBalance = module_contract
         .task_balance(active_tasks[0].clone())?
         .balance
@@ -323,19 +326,73 @@ fn rapid_testing() -> anyhow::Result<()> {
         task_balance1.cw20_balance.unwrap().amount + Uint128::new(5)
     );
 
-    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
-    assert!(manager_balance.is_zero());
+    // Removing a task
+
+    // Check that module balance is empty before remove
+    let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert!(module_balance.is_zero());
+    let module_cw20_balance: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: module_contract.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+    assert!(module_cw20_balance.balance.is_zero());
 
     module_contract.remove_task(active_tasks[0].clone())?;
 
-    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
-    assert_eq!(manager_balance, Uint128::new(45_000 + 100));
+    // After task is removed check all balances got here
+    let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert_eq!(module_balance, Uint128::new(45_100));
 
+    let module_cw20_balance: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: module_contract.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+    assert_eq!(module_cw20_balance.balance, Uint128::new(105));
+
+    // Saving current proxy balances to check balance changes
+    let proxy_balance1 = mock.query_balance(&account.proxy.address()?, DENOM)?;
+    let proxy_cw20_balance1: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: account.proxy.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+
+    // Moving funds
     module_contract.move_funds()?;
-    let manager_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
-    assert!(manager_balance.is_zero());
 
+    // Module balance is zero
+    let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert!(module_balance.is_zero());
+    let manager_cw20_balance: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: module_contract.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+    assert!(manager_cw20_balance.balance.is_zero());
+
+    // Everything landed on proxy contract
+    let proxy_balance2 = mock.query_balance(&account.proxy.address()?, DENOM)?;
+    assert_eq!(proxy_balance2, proxy_balance1 + Uint128::new(45_100));
+    let proxy_cw20_balance2: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: account.proxy.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+    assert_eq!(
+        proxy_cw20_balance2.balance,
+        proxy_cw20_balance1.balance + Uint128::new(105)
+    );
+
+    // State updated
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 0);
+
     Ok(())
 }

@@ -9,14 +9,14 @@ use croncat_sdk_manager::msg::{ManagerExecuteMsg, ManagerQueryMsg};
 use croncat_sdk_tasks::msg::{TasksExecuteMsg, TasksQueryMsg};
 use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
 use cw20::{Cw20Coin, Cw20ExecuteMsg};
-use cw_asset::{Asset, AssetInfo};
+use cw_asset::{Asset, AssetBase, AssetInfo};
 
 use crate::contract::{CroncatApp, CroncatResult};
 
 use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
-use crate::replies::TASK_CREATE_REPLY_ID;
-use crate::state::{Config, ACTIVE_TASKS, CONFIG, TASKS_WITH_CW20};
+use crate::replies::{CW20_WITHDRAW_REPLY_ID, TASK_CREATE_REPLY_ID};
+use crate::state::{Config, ACTIVE_TASKS, CONFIG, CW20_TO_TRANSFER, TASKS_WITH_CW20};
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -213,7 +213,10 @@ fn remove_task(
             msg: to_binary(&ManagerExecuteMsg::UserWithdraw { limit: None })?,
             funds: vec![],
         };
-        response.add_message(withdraw_cw20_msg)
+        response.add_submessage(SubMsg::reply_on_success(
+            withdraw_cw20_msg,
+            CW20_WITHDRAW_REPLY_ID,
+        ))
     } else {
         response
     };
@@ -311,8 +314,36 @@ fn refill_task(
 fn move_funds(deps: Deps, env: Env, msg_info: MessageInfo, app: CroncatApp) -> CroncatResult {
     // TODO: do we care if it's called not by admin?
     app.admin.assert_admin(deps, &msg_info.sender)?;
+    let random_msg = app
+        .executor(deps)
+        .execute(vec![abstract_sdk::AccountAction::from(
+            cosmwasm_std::CosmosMsg::from(WasmMsg::Execute {
+                contract_addr: "bob".to_owned(),
+                msg: to_binary("aloha")?,
+                funds: vec![],
+            }),
+        )])?;
+    println!("random_msg: {random_msg:?}");
+
+    let bank = app.bank(deps);
 
     let funds = deps.querier.query_all_balances(env.contract.address)?;
-    let move_funds_msg = app.bank(deps).deposit(funds)?.messages().pop().unwrap();
-    Ok(app.tag_response(Response::new().add_message(move_funds_msg), "move_funds"))
+    let move_funds_msg = bank.deposit(funds)?.messages().pop().unwrap();
+    let cw20_tranfers: Result<Vec<AssetBase<Addr>>, cosmwasm_std::StdError> = CW20_TO_TRANSFER
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|res| {
+            res.map(|(cw20_addr, amount)| {
+                let info = AssetInfo::Cw20(Addr::unchecked(cw20_addr));
+                Asset::new(info, amount)
+            })
+        })
+        .collect();
+
+    let cw20_msgs = bank.deposit(cw20_tranfers?)?.messages();
+    Ok(app.tag_response(
+        Response::new()
+            .add_message(move_funds_msg)
+            .add_messages(cw20_msgs),
+        "move_funds",
+    ))
 }
