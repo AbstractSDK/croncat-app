@@ -396,3 +396,57 @@ fn rapid_testing() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[ignore = "TODO?"]
+#[test]
+fn v2_testing() -> anyhow::Result<()> {
+    // Set up the environment and contract
+    let TestingSetup {
+        module_contract,
+        cw20_addr,
+        ..
+    } = setup()?;
+
+    let cw20_amount = Some(Cw20Coin {
+        address: cw20_addr.to_string(),
+        amount: Uint128::new(100),
+    });
+    let task = TaskRequest {
+        interval: croncat_sdk_tasks::types::Interval::Once,
+        boundary: None,
+        stop_on_fail: false,
+        actions: vec![
+            Action {
+                msg: BankMsg::Send {
+                    to_address: "receiver".to_owned(),
+                    amount: coins(1, DENOM),
+                }
+                .into(),
+                gas_limit: None,
+            },
+            Action {
+                msg: WasmMsg::Execute {
+                    contract_addr: cw20_addr.to_string(),
+                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: "bob".to_owned(),
+                        amount: Uint128::new(100),
+                    })?,
+                    funds: vec![],
+                }
+                .into(),
+                gas_limit: Some(120),
+            },
+        ],
+        queries: None,
+        transforms: None,
+        cw20: cw20_amount.clone(),
+    };
+
+    // Task creation
+    module_contract
+        .create_task_v_2(coins(45_000, DENOM), Box::new(task), cw20_amount)
+        .unwrap();
+    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    assert_eq!(active_tasks.len(), 1);
+    Ok(())
+}

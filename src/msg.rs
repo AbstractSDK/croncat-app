@@ -44,8 +44,10 @@ pub enum AppExecuteMsg {
         cw20_funds: Option<Cw20Coin>,
     },
     MoveFunds {},
-    Tick {
-        auto_withdraw: bool,
+    CreateTaskV2 {
+        task: Box<CronCatTaskRequest>,
+        funds: Vec<Coin>,
+        cw20_funds: Option<Cw20Coin>,
     },
 }
 

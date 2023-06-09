@@ -1,7 +1,8 @@
 use abstract_sdk::features::AbstractResponse;
-use abstract_sdk::{Execution, TransferInterface};
+use abstract_sdk::{AccountAction, Execution, TransferInterface};
 use cosmwasm_std::{
-    to_binary, Addr, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Response, SubMsg, WasmMsg,
+    to_binary, wasm_execute, Addr, Coin, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    ReplyOn, Response, SubMsg,
 };
 use croncat_integration_utils::task_creation::get_latest_croncat_contract;
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
@@ -41,7 +42,11 @@ pub fn execute_handler(
             cw20_funds,
         } => refill_task(deps.as_ref(), env, info, app, task_hash, funds, cw20_funds),
         AppExecuteMsg::MoveFunds {} => move_funds(deps.as_ref(), env, info, app),
-        AppExecuteMsg::Tick { .. } => todo!(),
+        AppExecuteMsg::CreateTaskV2 {
+            task,
+            funds,
+            cw20_funds,
+        } => create_task_v2(deps.as_ref(), env, info, app, task, funds, cw20_funds),
     }
 }
 
@@ -59,6 +64,66 @@ fn update_config(
 
     CONFIG.save(deps.storage, &Config { factory_addr })?;
     Ok(app.tag_response(Response::default(), "update_config"))
+}
+
+/// Create a task without moving funds
+fn create_task_v2(
+    deps: Deps,
+    _env: Env,
+    msg_info: MessageInfo,
+    app: CroncatApp,
+    task_request: Box<TaskRequest>,
+    funds: Vec<Coin>,
+    cw20_funds: Option<Cw20Coin>,
+) -> CroncatResult {
+    app.admin.assert_admin(deps, &msg_info.sender)?;
+
+    let config = CONFIG.load(deps.storage)?;
+
+    let tasks_addr = get_latest_croncat_contract(
+        &deps.querier,
+        config.factory_addr.clone(),
+        TASKS_NAME.to_owned(),
+    )?;
+    let executor = app.executor(deps);
+
+    let messages = if let Some(cw20) = cw20_funds {
+        let manager_addr = get_latest_croncat_contract(
+            &deps.querier,
+            config.factory_addr,
+            MANAGER_NAME.to_owned(),
+        )?;
+        // TODO: Bank::send?
+        let cw20_transfer: CosmosMsg = wasm_execute(
+            cw20.address,
+            &Cw20ExecuteMsg::Send {
+                contract: manager_addr.to_string(),
+                amount: cw20.amount,
+                msg: to_binary(&croncat_sdk_manager::msg::ManagerReceiveMsg::RefillTempBalance {})?,
+            },
+            vec![],
+        )?
+        .into();
+        vec![executor.execute(vec![AccountAction::from(cw20_transfer)])?]
+    } else {
+        vec![]
+    };
+    let create_task_msg: CosmosMsg = wasm_execute(
+        tasks_addr.to_string(),
+        &TasksExecuteMsg::CreateTask { task: task_request },
+        funds,
+    )?
+    .into();
+    let create_task_submsg = app.executor(deps).execute_with_reply(
+        vec![AccountAction::from(create_task_msg)],
+        ReplyOn::Success,
+        TASK_CREATE_REPLY_ID,
+    )?;
+
+    let response = Response::default()
+        .add_messages(messages)
+        .add_submessage(create_task_submsg);
+    Ok(app.tag_response(response, "create_task"))
 }
 
 /// Create a task
@@ -91,15 +156,15 @@ fn create_task(
             config.factory_addr,
             MANAGER_NAME.to_owned(),
         )?;
-        let cw20_transfer = WasmMsg::Execute {
-            contract_addr: cw20.address,
-            msg: to_binary(&Cw20ExecuteMsg::Send {
+        let cw20_transfer = wasm_execute(
+            cw20.address,
+            &Cw20ExecuteMsg::Send {
                 contract: manager_addr.to_string(),
                 amount: cw20.amount,
                 msg: to_binary(&croncat_sdk_manager::msg::ManagerReceiveMsg::RefillTempBalance {})?,
-            })?,
-            funds: vec![],
-        };
+            },
+            vec![],
+        )?;
         let bank_actions = vec![
             bank.withdraw(&env, funds.clone())?,
             bank.withdraw(&env, vec![asset])?,
@@ -114,11 +179,11 @@ fn create_task(
     };
 
     let create_task_submsg = SubMsg::reply_on_success(
-        WasmMsg::Execute {
-            contract_addr: tasks_addr.to_string(),
-            msg: to_binary(&TasksExecuteMsg::CreateTask { task: task_request })?,
+        wasm_execute(
+            tasks_addr.to_string(),
+            &TasksExecuteMsg::CreateTask { task: task_request },
             funds,
-        },
+        )?,
         TASK_CREATE_REPLY_ID,
     );
 
@@ -195,11 +260,11 @@ fn remove_task(
     let task_response = local_remove_task(&mut deps, &task_version, &task_hash, &tasks_addr)?;
 
     let response = if task_response.task.is_some() {
-        let remove_task_msg = WasmMsg::Execute {
-            contract_addr: tasks_addr.into_string(),
-            msg: to_binary(&TasksExecuteMsg::RemoveTask { task_hash })?,
-            funds: vec![],
-        };
+        let remove_task_msg = wasm_execute(
+            tasks_addr.into_string(),
+            &TasksExecuteMsg::RemoveTask { task_hash },
+            vec![],
+        )?;
         Response::new().add_message(remove_task_msg)
     } else {
         Response::new()
@@ -208,11 +273,11 @@ fn remove_task(
     let response = if with_cw20 && task_response.task.is_some()
         || check_for_cw20_leftovers(deps.as_ref(), env, &manager_addr)?
     {
-        let withdraw_cw20_msg = WasmMsg::Execute {
-            contract_addr: manager_addr.into_string(),
-            msg: to_binary(&ManagerExecuteMsg::UserWithdraw { limit: None })?,
-            funds: vec![],
-        };
+        let withdraw_cw20_msg = wasm_execute(
+            manager_addr.into_string(),
+            &ManagerExecuteMsg::UserWithdraw { limit: None },
+            vec![],
+        )?;
         response.add_submessage(SubMsg::reply_on_success(
             withdraw_cw20_msg,
             CW20_WITHDRAW_REPLY_ID,
@@ -270,9 +335,9 @@ fn refill_task(
         let info = AssetInfo::Cw20(deps.api.addr_validate(&cw20.address)?);
         let asset = Asset::new(info, cw20.amount);
 
-        let cw20_transfer = WasmMsg::Execute {
-            contract_addr: cw20.address,
-            msg: to_binary(&Cw20ExecuteMsg::Send {
+        let cw20_transfer = wasm_execute(
+            cw20.address,
+            &Cw20ExecuteMsg::Send {
                 contract: manager_addr.to_string(),
                 amount: cw20.amount,
                 msg: to_binary(
@@ -280,9 +345,9 @@ fn refill_task(
                         task_hash: task_hash.clone(),
                     },
                 )?,
-            })?,
-            funds: vec![],
-        };
+            },
+            vec![],
+        )?;
         let bank_actions = vec![
             bank.withdraw(&env, funds.clone())?,
             bank.withdraw(&env, vec![asset])?,
@@ -300,11 +365,11 @@ fn refill_task(
     if funds.is_empty() {
         Ok(app.tag_response(response, "refill_task"))
     } else {
-        let refill_task_msg = WasmMsg::Execute {
-            contract_addr: manager_addr.to_string(),
-            msg: to_binary(&ManagerExecuteMsg::RefillTaskBalance { task_hash })?,
+        let refill_task_msg = wasm_execute(
+            manager_addr.to_string(),
+            &ManagerExecuteMsg::RefillTaskBalance { task_hash },
             funds,
-        };
+        )?;
         Ok(app.tag_response(response.add_message(refill_task_msg), "refill_task"))
     }
 }
@@ -314,16 +379,6 @@ fn refill_task(
 fn move_funds(deps: Deps, env: Env, msg_info: MessageInfo, app: CroncatApp) -> CroncatResult {
     // TODO: do we care if it's called not by admin?
     app.admin.assert_admin(deps, &msg_info.sender)?;
-    let random_msg = app
-        .executor(deps)
-        .execute(vec![abstract_sdk::AccountAction::from(
-            cosmwasm_std::CosmosMsg::from(WasmMsg::Execute {
-                contract_addr: "bob".to_owned(),
-                msg: to_binary("aloha")?,
-                funds: vec![],
-            }),
-        )])?;
-    println!("random_msg: {random_msg:?}");
 
     let bank = app.bank(deps);
 
