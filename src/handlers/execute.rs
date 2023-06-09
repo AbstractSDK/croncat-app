@@ -228,7 +228,7 @@ fn remove_task(
     let config = CONFIG.load(deps.storage)?;
     let (task_version, with_cw20) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
 
-    // TODO: create helper on factory
+    // TODO: create helper on integration tools
     let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
             &deps.querier,
@@ -316,7 +316,7 @@ fn refill_task(
     let config = CONFIG.load(deps.storage)?;
     let (task_version, _with_cw20) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
 
-    // TODO: create helper on factory
+    // TODO: create helper on integration tools
     let manager_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
             &deps.querier,

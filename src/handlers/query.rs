@@ -38,7 +38,7 @@ fn query_active_tasks(deps: Deps) -> StdResult<Vec<String>> {
 fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
     let (task_version, _) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let config = CONFIG.load(deps.storage)?;
-    // TODO: create helper on factory
+    // TODO: create helper on integration tools
     let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
             &deps.querier,
@@ -62,7 +62,7 @@ fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
 fn query_task_balance(deps: Deps, task_hash: String) -> StdResult<TaskBalanceResponse> {
     let (task_version, _) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let config = CONFIG.load(deps.storage)?;
-    // TODO: create helper on factory
+    // TODO: create helper on integration tools
     let manager_addr = croncat_factory::state::CONTRACT_ADDRS
         .query(
             &deps.querier,
