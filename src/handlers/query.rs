@@ -1,4 +1,4 @@
-use crate::contract::{CroncatApp, CroncatResult};
+use crate::contract::{get_croncat_contract, CroncatApp, CroncatResult};
 use crate::msg::{AppQueryMsg, ConfigResponse};
 use crate::state::{ACTIVE_TASKS, CONFIG};
 use cosmwasm_std::{to_binary, Binary, Deps, Env, StdResult};
@@ -36,22 +36,14 @@ fn query_active_tasks(deps: Deps) -> StdResult<Vec<String>> {
 }
 
 fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
-    let (task_version, _) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let config = CONFIG.load(deps.storage)?;
-    // TODO: create helper on integration tools
-    let tasks_addr = croncat_factory::state::CONTRACT_ADDRS
-        .query(
-            &deps.querier,
-            config.factory_addr,
-            (
-                TASKS_NAME,
-                &task_version
-                    .split('.')
-                    .map(|num| num.parse::<u8>().unwrap())
-                    .collect::<Vec<u8>>(),
-            ),
-        )?
-        .unwrap();
+    let tasks_addr = get_croncat_contract(
+        &deps.querier,
+        config.factory_addr,
+        TASKS_NAME,
+        &task_version,
+    )?;
 
     let task_info: TaskResponse = deps
         .querier
@@ -60,22 +52,14 @@ fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
 }
 
 fn query_task_balance(deps: Deps, task_hash: String) -> StdResult<TaskBalanceResponse> {
-    let (task_version, _) = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let config = CONFIG.load(deps.storage)?;
-    // TODO: create helper on integration tools
-    let manager_addr = croncat_factory::state::CONTRACT_ADDRS
-        .query(
-            &deps.querier,
-            config.factory_addr,
-            (
-                MANAGER_NAME,
-                &task_version
-                    .split('.')
-                    .map(|num| num.parse::<u8>().unwrap())
-                    .collect::<Vec<u8>>(),
-            ),
-        )?
-        .unwrap();
+    let manager_addr = get_croncat_contract(
+        &deps.querier,
+        config.factory_addr,
+        MANAGER_NAME,
+        &task_version,
+    )?;
 
     let task_balance: TaskBalanceResponse = deps
         .querier

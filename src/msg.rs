@@ -43,12 +43,6 @@ pub enum AppExecuteMsg {
         funds: Vec<Coin>,
         cw20_funds: Option<Cw20Coin>,
     },
-    MoveFunds {},
-    CreateTaskV2 {
-        task: Box<CronCatTaskRequest>,
-        funds: Vec<Coin>,
-        cw20_funds: Option<Cw20Coin>,
-    },
 }
 
 #[cosmwasm_schema::cw_serde]

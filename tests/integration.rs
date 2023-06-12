@@ -305,14 +305,16 @@ fn rapid_testing() -> anyhow::Result<()> {
         .task_balance(active_tasks[0].clone())?
         .balance
         .unwrap();
-    module_contract.refill_task(
-        coins(100, DENOM),
-        active_tasks[0].clone(),
-        Some(Cw20Coin {
-            address: cw20_addr.to_string(),
-            amount: Uint128::new(5),
-        }),
-    )?;
+    module_contract
+        .refill_task(
+            coins(100, DENOM),
+            active_tasks[0].clone(),
+            Some(Cw20Coin {
+                address: cw20_addr.to_string(),
+                amount: Uint128::new(5),
+            }),
+        )
+        .unwrap();
     let task_balance2: TaskBalance = module_contract
         .task_balance(active_tasks[0].clone())?
         .balance
@@ -339,20 +341,6 @@ fn rapid_testing() -> anyhow::Result<()> {
     )?;
     assert!(module_cw20_balance.balance.is_zero());
 
-    module_contract.remove_task(active_tasks[0].clone())?;
-
-    // After task is removed check all balances got here
-    let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
-    assert_eq!(module_balance, Uint128::new(45_100));
-
-    let module_cw20_balance: cw20::BalanceResponse = mock.query(
-        &Cw20QueryMsg::Balance {
-            address: module_contract.addr_str()?,
-        },
-        &cw20_addr,
-    )?;
-    assert_eq!(module_cw20_balance.balance, Uint128::new(105));
-
     // Saving current proxy balances to check balance changes
     let proxy_balance1 = mock.query_balance(&account.proxy.address()?, DENOM)?;
     let proxy_cw20_balance1: cw20::BalanceResponse = mock.query(
@@ -361,9 +349,6 @@ fn rapid_testing() -> anyhow::Result<()> {
         },
         &cw20_addr,
     )?;
-
-    // Moving funds
-    module_contract.move_funds()?;
 
     // Module balance is zero
     let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
@@ -375,6 +360,20 @@ fn rapid_testing() -> anyhow::Result<()> {
         &cw20_addr,
     )?;
     assert!(manager_cw20_balance.balance.is_zero());
+
+    module_contract.remove_task(active_tasks[0].clone())?;
+
+    // After task is removed check all balances got not here
+    let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
+    assert!(module_balance.is_zero());
+
+    let module_cw20_balance: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: module_contract.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+    assert!(module_cw20_balance.balance.is_zero());
 
     // Everything landed on proxy contract
     let proxy_balance2 = mock.query_balance(&account.proxy.address()?, DENOM)?;
@@ -394,59 +393,5 @@ fn rapid_testing() -> anyhow::Result<()> {
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 0);
 
-    Ok(())
-}
-
-#[ignore = "TODO?"]
-#[test]
-fn v2_testing() -> anyhow::Result<()> {
-    // Set up the environment and contract
-    let TestingSetup {
-        module_contract,
-        cw20_addr,
-        ..
-    } = setup()?;
-
-    let cw20_amount = Some(Cw20Coin {
-        address: cw20_addr.to_string(),
-        amount: Uint128::new(100),
-    });
-    let task = TaskRequest {
-        interval: croncat_sdk_tasks::types::Interval::Once,
-        boundary: None,
-        stop_on_fail: false,
-        actions: vec![
-            Action {
-                msg: BankMsg::Send {
-                    to_address: "receiver".to_owned(),
-                    amount: coins(1, DENOM),
-                }
-                .into(),
-                gas_limit: None,
-            },
-            Action {
-                msg: WasmMsg::Execute {
-                    contract_addr: cw20_addr.to_string(),
-                    msg: to_binary(&Cw20ExecuteMsg::Transfer {
-                        recipient: "bob".to_owned(),
-                        amount: Uint128::new(100),
-                    })?,
-                    funds: vec![],
-                }
-                .into(),
-                gas_limit: Some(120),
-            },
-        ],
-        queries: None,
-        transforms: None,
-        cw20: cw20_amount.clone(),
-    };
-
-    // Task creation
-    module_contract
-        .create_task_v_2(coins(45_000, DENOM), Box::new(task), cw20_amount)
-        .unwrap();
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
-    assert_eq!(active_tasks.len(), 1);
     Ok(())
 }

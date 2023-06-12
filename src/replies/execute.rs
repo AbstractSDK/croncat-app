@@ -1,63 +1,82 @@
 use crate::{
-    contract::{CroncatApp, CroncatResult},
+    contract::{check_users_balance_nonempty, CroncatApp, CroncatResult},
     error::AppError,
-    state::{ACTIVE_TASKS, CW20_TO_TRANSFER},
+    state::{ACTIVE_TASKS, REMOVED_TASK_MANAGER_ADDR},
 };
 
-use abstract_sdk::features::AbstractResponse;
-use cosmwasm_std::{DepsMut, Env, Event, Reply, Response};
-use croncat_integration_utils::reply_handler::reply_handle_croncat_task_creation;
+use abstract_sdk::{
+    features::{AbstractResponse, AccountIdentification},
+    Execution,
+};
+use cosmwasm_std::{wasm_execute, CosmosMsg, DepsMut, Env, Reply, Response};
+use croncat_sdk_manager::msg::ManagerExecuteMsg;
 
 pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply) -> CroncatResult {
-    let (task, _bin) = reply_handle_croncat_task_creation(reply)?;
-    ACTIVE_TASKS.update(
-        deps.storage,
-        &task.task_hash,
-        |task_version| match task_version {
-            Some(_) => Err(AppError::TaskAlreadyExists {
-                task_hash: task.task_hash.clone(),
-            }),
-            None => Ok((task.version, task.amount_for_one_task.cw20.is_some())),
-        },
-    )?;
+    // TODO: https://github.com/AbstractSDK/contracts/issues/364
+    // let (task, _bin) = reply_handle_croncat_task_creation(reply)?;
+
+    let events = reply.result.unwrap().events;
+    let create_task_event = events
+        .into_iter()
+        .find(|ev| {
+            ev.ty == "wasm"
+                && ev
+                    .attributes
+                    .iter()
+                    .any(|attr| attr.key == "action" && attr.value == "create_task")
+        })
+        .unwrap();
+    let task_hash = create_task_event
+        .attributes
+        .iter()
+        .find(|&attr| attr.key == "task_hash")
+        .unwrap()
+        .value
+        .clone();
+    let task_version = create_task_event
+        .attributes
+        .into_iter()
+        .find(|attr| attr.key == "task_version")
+        .unwrap()
+        .value;
+    ACTIVE_TASKS.update(deps.storage, &task_hash, |ver| match ver {
+        Some(_) => Err(AppError::TaskAlreadyExists {
+            task_hash: task_hash.clone(),
+        }),
+        None => Ok(task_version),
+    })?;
 
     Ok(app.tag_response(
-        Response::new().add_attribute("task_hash", task.task_hash),
+        Response::new().add_attribute("task_hash", task_hash),
         "create_task_reply",
     ))
 }
 
-pub fn cw20_withdraw_reply(
+pub fn task_remove_reply(
     deps: DepsMut,
     _env: Env,
     app: CroncatApp,
-    reply: Reply,
+    _reply: Reply,
 ) -> CroncatResult {
-    let res = reply.result.unwrap();
-
-    for Event { ty, attributes, .. } in res.events {
-        if ty == "wasm"
-            && attributes
-                .iter()
-                .any(|attr| attr.key == "action" && attr.value == "transfer")
-        {
-            let addr = attributes
-                .iter()
-                .find(|&attr| attr.key == "_contract_addr")
-                .unwrap()
-                .value
-                .as_ref();
-            let amount = attributes
-                .iter()
-                .find(|&attr| attr.key == "amount")
-                .unwrap()
-                .value
-                .parse::<cosmwasm_std::Uint128>()
-                .unwrap();
-            CW20_TO_TRANSFER.update(deps.storage, addr, |am| {
-                CroncatResult::Ok(am.unwrap_or_default() + amount)
-            })?;
-        }
-    }
-    Ok(app.tag_response(Response::new(), "cw20_withdraw_reply"))
+    let manager_addr = REMOVED_TASK_MANAGER_ADDR.load(deps.storage)?;
+    let response = if check_users_balance_nonempty(
+        deps.as_ref(),
+        app.proxy_address(deps.as_ref())?,
+        manager_addr.clone(),
+    )? {
+        // withdraw locked balance
+        let withdraw_msg: CosmosMsg = wasm_execute(
+            manager_addr,
+            &ManagerExecuteMsg::UserWithdraw { limit: None },
+            vec![],
+        )?
+        .into();
+        let executor_message = app
+            .executor(deps.as_ref())
+            .execute(vec![withdraw_msg.into()])?;
+        Response::new().add_message(executor_message)
+    } else {
+        Response::new()
+    };
+    Ok(app.tag_response(response, "task_remove_reply"))
 }
