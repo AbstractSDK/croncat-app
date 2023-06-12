@@ -36,8 +36,8 @@ fn query_active_tasks(deps: Deps) -> StdResult<Vec<String>> {
 }
 
 fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
-    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let config = CONFIG.load(deps.storage)?;
+    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let tasks_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr,
