@@ -1,9 +1,8 @@
 use abstract_core::app;
 use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
-use cosmwasm_std::Coin;
 use croncat_integration_utils::CronCatTaskRequest;
-use cw20::Cw20Coin;
+use cw_asset::AssetListUnchecked;
 
 use crate::{contract::CroncatApp, state::Config};
 
@@ -32,16 +31,14 @@ pub enum AppExecuteMsg {
     },
     CreateTask {
         task: Box<CronCatTaskRequest>,
-        funds: Vec<Coin>,
-        cw20_funds: Option<Cw20Coin>,
+        assets: AssetListUnchecked,
     },
     RemoveTask {
         task_hash: String,
     },
     RefillTask {
         task_hash: String,
-        funds: Vec<Coin>,
-        cw20_funds: Option<Cw20Coin>,
+        assets: AssetListUnchecked,
     },
 }
 

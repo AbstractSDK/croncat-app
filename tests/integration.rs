@@ -22,6 +22,7 @@ use croncat_sdk_tasks::{
 };
 
 use cw20::{Cw20Coin, Cw20ExecuteMsg, Cw20QueryMsg};
+use cw_asset::{Asset, AssetList, AssetListUnchecked};
 use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
 use cw_orch::{anyhow, deploy::Deploy, prelude::*};
@@ -258,10 +259,10 @@ fn rapid_testing() -> anyhow::Result<()> {
         ..
     } = setup()?;
 
-    let cw20_amount = Some(Cw20Coin {
+    let cw20_amount = Cw20Coin {
         address: cw20_addr.to_string(),
         amount: Uint128::new(100),
-    });
+    };
     let task = TaskRequest {
         interval: croncat_sdk_tasks::types::Interval::Once,
         boundary: None,
@@ -290,13 +291,19 @@ fn rapid_testing() -> anyhow::Result<()> {
         ],
         queries: None,
         transforms: None,
-        cw20: cw20_amount.clone(),
+        cw20: Some(cw20_amount.clone()),
     };
 
     // Task creation
-    module_contract
-        .create_task(coins(45_000, DENOM), Box::new(task), cw20_amount)
-        .unwrap();
+    let assets = {
+        let mut assets = AssetList::from(coins(45_000, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            cw20_amount.amount,
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.create_task(assets, Box::new(task)).unwrap();
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 1);
 
@@ -305,15 +312,16 @@ fn rapid_testing() -> anyhow::Result<()> {
         .task_balance(active_tasks[0].clone())?
         .balance
         .unwrap();
+    let assets = {
+        let mut assets = AssetList::from(coins(100, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(5),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
     module_contract
-        .refill_task(
-            coins(100, DENOM),
-            active_tasks[0].clone(),
-            Some(Cw20Coin {
-                address: cw20_addr.to_string(),
-                amount: Uint128::new(5),
-            }),
-        )
+        .refill_task(assets, active_tasks[0].clone())
         .unwrap();
     let task_balance2: TaskBalance = module_contract
         .task_balance(active_tasks[0].clone())?
