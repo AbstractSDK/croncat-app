@@ -15,13 +15,16 @@ use common::contracts;
 use croncat_integration_utils::{AGENTS_NAME, MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;
 use croncat_sdk_factory::msg::{FactoryInstantiateMsg, ModuleInstantiateInfo, VersionKind};
-use croncat_sdk_manager::{msg::ManagerInstantiateMsg, types::TaskBalance};
+use croncat_sdk_manager::{
+    msg::ManagerInstantiateMsg,
+    types::{TaskBalance, TaskBalanceResponse},
+};
 use croncat_sdk_tasks::{
     msg::TasksInstantiateMsg,
     types::{Action, TaskRequest, TaskResponse},
 };
 
-use cw20::{Cw20Coin, Cw20ExecuteMsg, Cw20QueryMsg};
+use cw20::{Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg, Cw20QueryMsg};
 use cw_asset::{Asset, AssetList, AssetListUnchecked};
 use cw_multi_test::Executor;
 // Use prelude to get all the necessary imports
@@ -470,7 +473,7 @@ fn update_config() -> anyhow::Result<()> {
 }
 
 #[test]
-fn assets_attachments() -> anyhow::Result<()> {
+fn create_task() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
         module_contract,
@@ -550,6 +553,7 @@ fn assets_attachments() -> anyhow::Result<()> {
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 2);
 
+    // This task creation we won't attach cw20s because we had some unused balance from the last creation
     let task = TaskRequest {
         interval: croncat_sdk_tasks::types::Interval::Once,
         boundary: None,
@@ -575,6 +579,133 @@ fn assets_attachments() -> anyhow::Result<()> {
 
     let active_tasks: Vec<String> = module_contract.active_tasks()?;
     assert_eq!(active_tasks.len(), 3);
+
+    Ok(())
+}
+
+#[test]
+fn refill_task() -> anyhow::Result<()> {
+    // Set up the environment and contract
+    let TestingSetup {
+        module_contract,
+        mock: _,
+        account: _,
+        cw20_addr,
+        ..
+    } = setup()?;
+
+    let cw20_amount = Cw20Coin {
+        address: cw20_addr.to_string(),
+        amount: Uint128::new(20),
+    };
+    let task = TaskRequest {
+        interval: croncat_sdk_tasks::types::Interval::Once,
+        boundary: None,
+        stop_on_fail: false,
+        actions: vec![Action {
+            msg: WasmMsg::Execute {
+                contract_addr: cw20_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: "bob".to_owned(),
+                    amount: Uint128::new(20),
+                })?,
+                funds: vec![],
+            }
+            .into(),
+            gas_limit: Some(120),
+        }],
+        queries: None,
+        transforms: None,
+        cw20: Some(cw20_amount),
+    };
+
+    let assets = {
+        let mut assets = AssetList::from(coins(40_000, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(20),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.create_task(assets, Box::new(task))?;
+
+    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let task_hash = active_tasks[0].clone();
+
+    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    assert_eq!(
+        task_balance.balance.unwrap(),
+        TaskBalance {
+            native_balance: Uint128::new(40_000),
+            cw20_balance: Some(Cw20CoinVerified {
+                address: Addr::unchecked(cw20_addr.clone()),
+                amount: Uint128::new(20)
+            }),
+            ibc_balance: None
+        }
+    );
+
+    // Refill only with native coins
+    let assets = AssetListUnchecked::from(AssetList::from(coins(123, DENOM)));
+    module_contract.refill_task(assets, task_hash.clone())?;
+    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    assert_eq!(
+        task_balance.balance.unwrap(),
+        TaskBalance {
+            native_balance: Uint128::new(40_123),
+            cw20_balance: Some(Cw20CoinVerified {
+                address: Addr::unchecked(cw20_addr.clone()),
+                amount: Uint128::new(20)
+            }),
+            ibc_balance: None
+        }
+    );
+
+    // Refill only with cw20 coins
+    let assets = {
+        let mut assets = AssetList::new();
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(25),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.refill_task(assets, task_hash.clone())?;
+    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    assert_eq!(
+        task_balance.balance.unwrap(),
+        TaskBalance {
+            native_balance: Uint128::new(40_123),
+            cw20_balance: Some(Cw20CoinVerified {
+                address: Addr::unchecked(cw20_addr.clone()),
+                amount: Uint128::new(45)
+            }),
+            ibc_balance: None
+        }
+    );
+
+    // Refill with both
+    let assets = {
+        let mut assets = AssetList::from(coins(1_000, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(55),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.refill_task(assets, task_hash.clone())?;
+    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash)?;
+    assert_eq!(
+        task_balance.balance.unwrap(),
+        TaskBalance {
+            native_balance: Uint128::new(41_123),
+            cw20_balance: Some(Cw20CoinVerified {
+                address: Addr::unchecked(cw20_addr),
+                amount: Uint128::new(100)
+            }),
+            ibc_balance: None
+        }
+    );
 
     Ok(())
 }
