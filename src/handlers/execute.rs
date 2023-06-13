@@ -73,6 +73,7 @@ fn create_task(
     let config = CONFIG.load(deps.storage)?;
     let executor = app.executor(deps);
 
+    // Getting needed croncat addresses from factory
     let tasks_addr = get_latest_croncat_contract(
         &deps.querier,
         config.factory_addr.clone(),
@@ -81,6 +82,7 @@ fn create_task(
     let manager_addr =
         get_latest_croncat_contract(&deps.querier, config.factory_addr, MANAGER_NAME.to_owned())?;
 
+    // Making create task message that will be sended by the proxy
     let create_task_msg: CosmosMsg = wasm_execute(
         tasks_addr,
         &TasksExecuteMsg::CreateTask { task: task_request },
@@ -93,6 +95,7 @@ fn create_task(
         TASK_CREATE_REPLY_ID,
     )?;
 
+    // Send any required cw20s before task creation
     let mut messages = vec![];
     for cw20 in cw20s {
         let cw20_transfer: CosmosMsg = wasm_execute(
@@ -148,6 +151,8 @@ fn remove_task(
         },
     )?;
 
+    // If there is still task by this hash on contract send remove message
+    // If not - check if there is anything to withdraw and withdraw if needed
     let response = if task_response.task.is_some() {
         let remove_task_msg: CosmosMsg = wasm_execute(
             tasks_addr,

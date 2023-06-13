@@ -14,9 +14,12 @@ use common::contracts;
 
 use croncat_integration_utils::{AGENTS_NAME, MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;
-use croncat_sdk_factory::msg::{FactoryInstantiateMsg, ModuleInstantiateInfo, VersionKind};
+use croncat_sdk_factory::msg::{
+    ContractMetadataResponse, FactoryInstantiateMsg, FactoryQueryMsg, ModuleInstantiateInfo,
+    VersionKind,
+};
 use croncat_sdk_manager::{
-    msg::ManagerInstantiateMsg,
+    msg::{ManagerExecuteMsg, ManagerInstantiateMsg},
     types::{TaskBalance, TaskBalanceResponse},
 };
 use croncat_sdk_tasks::{
@@ -33,6 +36,7 @@ use cw_orch::{anyhow, deploy::Deploy, prelude::*};
 use cosmwasm_std::{coins, to_binary, Addr, BankMsg, Uint128, WasmMsg};
 // consts for testing
 const ADMIN: &str = "admin";
+const AGENT: &str = "agent";
 const VERSION: &str = "1.0";
 const DENOM: &str = "abstr";
 const PAUSE_ADMIN: &str = "cosmos338dwgj5wm2tuahvfjdldz5s8hmt7l5aznw8jz9s2mmgj5c52jqgfq000";
@@ -124,7 +128,7 @@ fn setup_croncat_contracts(
         min_coins_for_agent_registration: None,
         agents_eject_threshold: None,
         min_active_agent_count: None,
-        allowed_agents: Some(vec![]),
+        allowed_agents: Some(vec![AGENT.to_owned()]),
         public_registration: true,
     };
     let module_instantiate_info = ModuleInstantiateInfo {
@@ -183,6 +187,22 @@ fn setup_croncat_contracts(
     )
     .unwrap();
 
+    let response: ContractMetadataResponse = app.wrap().query_wasm_smart(
+        &factory_addr,
+        &FactoryQueryMsg::LatestContract {
+            contract_name: AGENTS_NAME.to_string(),
+        },
+    )?;
+    let agents_addr = response.metadata.unwrap().contract_addr;
+    app.execute_contract(
+        Addr::unchecked(AGENT),
+        agents_addr,
+        &croncat_sdk_agents::msg::ExecuteMsg::RegisterAgent {
+            payable_account_id: None,
+        },
+        &[],
+    )?;
+
     Ok((factory_addr, cw20_addr))
 }
 
@@ -202,6 +222,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
     // Create the mock
     let mock = Mock::new(&sender);
 
+    mock.set_balance(&Addr::unchecked(AGENT), coins(500_000, DENOM))?;
     // Construct the counter interface
     let mut contract = App::new(CRONCAT_ID, mock.clone());
     // Deploy Abstract to the mock
@@ -538,7 +559,7 @@ fn create_task() -> anyhow::Result<()> {
         cw20: Some(cw20_amount.clone()),
     };
 
-    // Let's attach now all the cw20s and create two tasks LOL
+    // Let's attach now 2x of the cw20s and create two tasks LOL
     let assets = {
         let mut assets = AssetList::from(coins(40_000, DENOM));
         assets.add(&Asset::cw20(
@@ -707,5 +728,157 @@ fn refill_task() -> anyhow::Result<()> {
         }
     );
 
+    Ok(())
+}
+
+#[test]
+fn remove_task() -> anyhow::Result<()> {
+    // Set up the environment and contract
+    let TestingSetup {
+        module_contract,
+        mock,
+        account,
+        cw20_addr,
+        ..
+    } = setup()?;
+
+    // Create two tasks
+    let cw20_amount = Cw20Coin {
+        address: cw20_addr.to_string(),
+        amount: Uint128::new(30),
+    };
+    let task = TaskRequest {
+        interval: croncat_sdk_tasks::types::Interval::Once,
+        boundary: None,
+        stop_on_fail: false,
+        actions: vec![Action {
+            msg: WasmMsg::Execute {
+                contract_addr: cw20_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: "bob".to_owned(),
+                    amount: Uint128::new(20),
+                })?,
+                funds: vec![],
+            }
+            .into(),
+            gas_limit: Some(120),
+        }],
+        queries: None,
+        transforms: None,
+        cw20: Some(cw20_amount),
+    };
+    let assets = {
+        let mut assets = AssetList::from(coins(40_000, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(30),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.create_task(assets, Box::new(task))?;
+
+    let cw20_amount = Cw20Coin {
+        address: cw20_addr.to_string(),
+        amount: Uint128::new(40),
+    };
+    let task = TaskRequest {
+        interval: croncat_sdk_tasks::types::Interval::Once,
+        boundary: None,
+        stop_on_fail: false,
+        actions: vec![Action {
+            msg: WasmMsg::Execute {
+                contract_addr: cw20_addr.to_string(),
+                msg: to_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: "alice".to_owned(),
+                    amount: Uint128::new(30),
+                })?,
+                funds: vec![],
+            }
+            .into(),
+            gas_limit: Some(120),
+        }],
+        queries: None,
+        transforms: None,
+        cw20: Some(cw20_amount),
+    };
+    let assets = {
+        let mut assets = AssetList::from(coins(40_000, DENOM));
+        assets.add(&Asset::cw20(
+            Addr::unchecked(cw20_addr.clone()),
+            Uint128::new(40),
+        ))?;
+        AssetListUnchecked::from(assets)
+    };
+    module_contract.create_task(assets, Box::new(task))?;
+
+    // One of them will be removed by the agent
+    let removed_task_hash = {
+        mock.wait_blocks(3)?;
+        let factory_addr: Addr = module_contract.config()?.config.factory_addr;
+        let response: ContractMetadataResponse = mock.query(
+            &FactoryQueryMsg::LatestContract {
+                contract_name: MANAGER_NAME.to_string(),
+            },
+            &factory_addr,
+        )?;
+        let manager_addr: Addr = response.metadata.unwrap().contract_addr;
+        let resp = mock.app.borrow_mut().execute_contract(
+            Addr::unchecked(AGENT),
+            manager_addr,
+            &ManagerExecuteMsg::ProxyCall { task_hash: None },
+            &[],
+        )?;
+        let event = resp
+            .events
+            .into_iter()
+            .find(|ev| {
+                ev.attributes
+                    .iter()
+                    .any(|attr| attr.key == "lifecycle" && attr.value == "task_ended")
+            })
+            .unwrap();
+        let attr = event
+            .attributes
+            .into_iter()
+            .find(|attr| attr.key == "task_hash")
+            .unwrap();
+        attr.value
+    };
+
+    // Note: not updated
+    let mut active_tasks: Vec<String> = module_contract.active_tasks()?;
+    assert_eq!(active_tasks.len(), 2);
+
+    active_tasks.retain(|task_hash| task_hash != &removed_task_hash);
+    let not_removed_task_hash = active_tasks.pop().unwrap();
+
+    let proxy_cw20_balance1: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: account.proxy.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+
+    module_contract.remove_task(removed_task_hash)?;
+
+    let proxy_cw20_balance2: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: account.proxy.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+
+    assert!(proxy_cw20_balance2.balance > proxy_cw20_balance1.balance);
+
+    module_contract.remove_task(not_removed_task_hash)?;
+
+    let proxy_cw20_balance3: cw20::BalanceResponse = mock.query(
+        &Cw20QueryMsg::Balance {
+            address: account.proxy.addr_str()?,
+        },
+        &cw20_addr,
+    )?;
+
+    assert!(proxy_cw20_balance3.balance > proxy_cw20_balance2.balance);
     Ok(())
 }
