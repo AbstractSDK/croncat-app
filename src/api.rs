@@ -1,11 +1,13 @@
 use abstract_core::objects::{module::ModuleId, AssetEntry};
-use abstract_sdk::AdapterInterface;
 use abstract_sdk::{
     features::{AccountIdentification, Dependencies},
     AbstractSdkResult,
 };
-use cosmwasm_std::{CosmosMsg, Decimal, Deps, Uint128};
-use croncat_integration_utils::CronCatTaskRequest;
+use abstract_sdk::{AdapterInterface, ModuleInterface};
+use cosmwasm_std::{wasm_execute, Coin, CosmosMsg, Decimal, Deps, Uint128};
+use croncat_integration_utils::task_creation::get_latest_croncat_contract;
+use croncat_integration_utils::{CronCatTaskRequest, TASKS_NAME};
+use croncat_sdk_tasks::msg::TasksExecuteMsg;
 
 use crate::contract::CRONCAT_ID;
 
@@ -35,22 +37,35 @@ pub struct CronCat<'a, T: CronCatInterface> {
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
-    /// Swap assets in the cron_cat
+    /// Create task message
+    /// It will return [`croncat_integration_utils::CronCatTaskExecutionInfo`] in reply data
+    /// so you can save `task_hash` and `version` or any other useful information
     pub fn create_task(
         &self,
         task: CronCatTaskRequest,
+        funds: Vec<Coin>,
     ) -> AbstractSdkResult<CosmosMsg> {
-        todo!("logic that creates a task")
-    }
+        let modules = self.base.modules(self.deps);
+        let querier = &self.deps.querier;
 
-    
+        let croncat_factory_address = modules.module_address(self.module_id)?;
+        let tasks_addr =
+            get_latest_croncat_contract(querier, croncat_factory_address, TASKS_NAME.to_string())
+                .unwrap();
+        Ok(wasm_execute(
+            tasks_addr,
+            &TasksExecuteMsg::CreateTask {
+                task: Box::new(task),
+            },
+            funds,
+        )?
+        .into())
+    }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// task_information
-    pub fn query_task_information(
-        &self,
-    ) -> AbstractSdkResult<()> {
+    pub fn query_task_information(&self) -> AbstractSdkResult<()> {
         todo!("logic that queries task information")
     }
 }
