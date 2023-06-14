@@ -62,7 +62,7 @@ cw-orch = { version = "0.12", optional = true }
 croncat-sdk-factory = "1.0.3"
 croncat-sdk-tasks = "1.0.3"
 croncat-sdk-manager = "1.0.3"
-croncat-integration-utils = "1.0.3"
+croncat-integration-utils = "1.1.0"
 # TODO: avoid using contract dep
 croncat-factory = { version = "1.0.3", features = ["library"]}
 
@@ -85,7 +85,7 @@ croncat-factory = "1.0.3"
 croncat-tasks = "1.0.3"
 croncat-manager = "1.0.3"
 croncat-agents = "1.0.3"
-croncat-integration-testing = "1.0.3"
+croncat-integration-testing = "1.1.0"
 
 # Testing cw20
 cw20-base = "0.16.0"

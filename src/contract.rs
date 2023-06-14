@@ -53,27 +53,3 @@ pub(crate) fn check_users_balance_nonempty(
     )?;
     Ok(!coins.is_empty())
 }
-
-pub(crate) fn get_croncat_contract(
-    querier: &cosmwasm_std::QuerierWrapper,
-    croncat_factory_address: cosmwasm_std::Addr,
-    croncat_contract_name: &str,
-    croncat_version: &str,
-) -> cosmwasm_std::StdResult<cosmwasm_std::Addr> {
-    // Parse string to a version.
-    let croncat_version_parsed = croncat_version
-        .split('.')
-        .map(|ver| ver.parse().unwrap())
-        .collect::<Vec<u8>>();
-
-    // Raw query the factory
-    let contract_addr = croncat_factory::state::CONTRACT_ADDRS
-        .query(
-            querier,
-            croncat_factory_address,
-            (croncat_contract_name, &croncat_version_parsed),
-        )?
-        .unwrap();
-
-    Ok(contract_addr)
-}

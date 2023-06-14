@@ -4,7 +4,7 @@ use cosmwasm_std::{
     coin, to_binary, wasm_execute, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn,
     Response,
 };
-use croncat_integration_utils::task_creation::get_latest_croncat_contract;
+use croncat_integration_utils::task_creation::{get_croncat_contract, get_latest_croncat_contract};
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
 use croncat_sdk_tasks::msg::{TasksExecuteMsg, TasksQueryMsg};
@@ -12,9 +12,7 @@ use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
 use cw20::{Cw20CoinVerified, Cw20ExecuteMsg};
 use cw_asset::AssetListUnchecked;
 
-use crate::contract::{
-    check_users_balance_nonempty, get_croncat_contract, CroncatApp, CroncatResult,
-};
+use crate::contract::{check_users_balance_nonempty, CroncatApp, CroncatResult};
 
 use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
@@ -133,14 +131,14 @@ fn remove_task(
     let tasks_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr.clone(),
-        TASKS_NAME,
-        &task_version,
+        TASKS_NAME.to_owned(),
+        task_version.clone(),
     )?;
     let manager_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr,
-        MANAGER_NAME,
-        &task_version,
+        MANAGER_NAME.to_owned(),
+        task_version,
     )?;
 
     ACTIVE_TASKS.remove(deps.storage, &task_hash);
@@ -210,8 +208,8 @@ fn refill_task(
     let manager_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr,
-        MANAGER_NAME,
-        &task_version,
+        MANAGER_NAME.to_owned(),
+        task_version,
     )?;
 
     let mut account_action: AccountAction = AccountAction::new();
