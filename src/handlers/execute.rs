@@ -1,20 +1,18 @@
 use abstract_sdk::features::{AbstractResponse, AccountIdentification};
 use abstract_sdk::{AccountAction, Execution};
 use cosmwasm_std::{
-    coin, to_binary, wasm_execute, Coin, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn,
-    Response,
+    to_binary, wasm_execute, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
 };
 use croncat_integration_utils::task_creation::{get_croncat_contract, get_latest_croncat_contract};
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
 use croncat_sdk_tasks::msg::{TasksExecuteMsg, TasksQueryMsg};
 use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
-use cw20::{Cw20CoinVerified, Cw20ExecuteMsg};
+use cw20::Cw20ExecuteMsg;
 use cw_asset::AssetListUnchecked;
 
-use crate::contract::{check_users_balance_nonempty, CroncatApp, CroncatResult};
+use crate::contract::{check_users_balance_nonempty, sort_funds, CroncatApp, CroncatResult};
 
-use crate::error::AppError;
 use crate::msg::AppExecuteMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
 use crate::state::{Config, ACTIVE_TASKS, CONFIG, REMOVED_TASK_MANAGER_ADDR};
@@ -242,28 +240,4 @@ fn refill_task(
     let msg = executor.execute(vec![account_action])?;
 
     Ok(app.tag_response(Response::new().add_message(msg), "refill_task"))
-}
-
-fn sort_funds(
-    deps: Deps,
-    assets: AssetListUnchecked,
-) -> Result<(Vec<Coin>, Vec<Cw20CoinVerified>), AppError> {
-    let assets = assets.check(deps.api, None)?;
-    let (funds, cw20s) =
-        assets
-            .into_iter()
-            .fold((vec![], vec![]), |(mut funds, mut cw20s), asset| {
-                match &asset.info {
-                    cw_asset::AssetInfoBase::Native(denom) => {
-                        funds.push(coin(asset.amount.u128(), denom))
-                    }
-                    cw_asset::AssetInfoBase::Cw20(address) => cw20s.push(Cw20CoinVerified {
-                        address: address.clone(),
-                        amount: asset.amount,
-                    }),
-                    _ => todo!(),
-                }
-                (funds, cw20s)
-            });
-    Ok((funds, cw20s))
 }
