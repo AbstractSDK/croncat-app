@@ -8,7 +8,7 @@ use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
     msg::{AppInstantiateMsg, ConfigResponse, InstantiateMsg},
-    App, AppExecuteMsgFns, AppQueryMsgFns,
+    AppExecuteMsgFns, AppQueryMsgFns, CroncatApp,
 };
 use common::contracts;
 
@@ -210,7 +210,7 @@ struct TestingSetup {
     account: AbstractAccount<Mock>,
     #[allow(unused)]
     abstr_deployment: Abstract<Mock>,
-    module_contract: App<Mock>,
+    module_contract: CroncatApp<Mock>,
     cw20_addr: Addr,
     mock: Mock,
 }
@@ -224,7 +224,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
 
     mock.set_balance(&Addr::unchecked(AGENT), coins(500_000, DENOM))?;
     // Construct the counter interface
-    let mut contract = App::new(CRONCAT_ID, mock.clone());
+    let mut contract = CroncatApp::new(CRONCAT_ID, mock.clone());
     // Deploy Abstract to the mock
     let abstr_deployment = Abstract::deploy_on(mock.clone(), Empty {})?;
     // Create a new account to install the app onto
