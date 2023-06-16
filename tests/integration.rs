@@ -2,13 +2,18 @@ mod common;
 
 use std::cell::RefMut;
 
-use abstract_core::{app::BaseInstantiateMsg, objects::gov_type::GovernanceDetails};
+use abstract_core::{
+    ans_host::ContractsResponse,
+    app::BaseInstantiateMsg,
+    objects::{gov_type::GovernanceDetails, UncheckedContractEntry},
+};
 use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
     msg::{AppInstantiateMsg, ConfigResponse, InstantiateMsg},
-    AppExecuteMsgFns, AppQueryMsgFns, CroncatApp,
+    state::Config,
+    AppExecuteMsgFns, AppQueryMsgFns, CroncatApp, CRON_CAT_FACTORY,
 };
 use common::contracts;
 
@@ -244,6 +249,15 @@ fn setup() -> anyhow::Result<TestingSetup> {
     let (factory_addr, cw20_addr) =
         setup_croncat_contracts(mock.app.as_ref().borrow_mut(), account.proxy.addr_str()?)?;
 
+    let factory_entry = UncheckedContractEntry::try_from(CRON_CAT_FACTORY.to_owned())?;
+    abstr_deployment.ans_host.execute(
+        &abstract_core::ans_host::ExecuteMsg::UpdateContractAddresses {
+            to_add: vec![(factory_entry, factory_addr.to_string())],
+            to_remove: vec![],
+        },
+        None,
+    )?;
+
     contract.deploy(CRONCAT_MODULE_VERSION.parse()?)?;
     account.install_module(
         CRONCAT_ID,
@@ -251,9 +265,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
             base: BaseInstantiateMsg {
                 ans_host_address: abstr_deployment.ans_host.addr_str()?,
             },
-            module: AppInstantiateMsg {
-                factory_addr: factory_addr.into_string(),
-            },
+            module: AppInstantiateMsg {},
         },
         None,
     )?;
@@ -329,7 +341,7 @@ fn all_in_one() -> anyhow::Result<()> {
         AssetListUnchecked::from(assets)
     };
     module_contract.create_task(assets, Box::new(task)).unwrap();
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
 
     // Refilling task
@@ -423,7 +435,7 @@ fn all_in_one() -> anyhow::Result<()> {
     );
 
     // State updated
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 0);
 
     Ok(())
@@ -434,7 +446,8 @@ fn admin() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
         mut module_contract,
-        mock,
+        mock: _,
+        cw20_addr,
         ..
     } = setup()?;
 
@@ -456,12 +469,19 @@ fn admin() -> anyhow::Result<()> {
     };
 
     // Not admin sender
-    module_contract.set_sender(&mock.sender);
+    // Neither installed module
+    module_contract.set_sender(&cw20_addr);
 
-    let expected_err = cw_controllers::AdminError::NotAdmin {}.to_string();
+    let expected_err = abstract_sdk::AbstractSdkError::MissingModule {
+        module: "crates.io:cw20-base".to_owned(),
+    }
+    .to_string();
 
-    let err = module_contract.update_config("new_addr".to_string());
-    assert_eq!(err.unwrap_err().root().to_string(), expected_err);
+    let err = module_contract.update_config();
+    assert_eq!(
+        err.unwrap_err().root().to_string(),
+        cw_controllers::AdminError::NotAdmin {}.to_string()
+    );
 
     let err = module_contract.create_task(AssetListUnchecked::default(), Box::new(task));
     assert_eq!(err.unwrap_err().root().to_string(), expected_err);
@@ -479,18 +499,17 @@ fn admin() -> anyhow::Result<()> {
 fn update_config() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
-        module_contract,
-        mock,
-        ..
+        module_contract, ..
     } = setup()?;
 
     let config_res: ConfigResponse = module_contract.config()?;
-    assert_ne!(config_res.config.factory_addr, mock.sender);
 
-    module_contract.update_config(mock.sender.to_string())?;
+    assert_eq!(config_res.config, Config {});
+
+    module_contract.update_config()?;
 
     let config_res: ConfigResponse = module_contract.config()?;
-    assert_eq!(config_res.config.factory_addr, mock.sender);
+    assert_eq!(config_res.config, Config {});
     Ok(())
 }
 
@@ -525,7 +544,7 @@ fn create_task() -> anyhow::Result<()> {
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
 
     let task_info_response: TaskResponse = module_contract.task_info(active_tasks[0].clone())?;
@@ -572,7 +591,7 @@ fn create_task() -> anyhow::Result<()> {
 
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
     // This task creation we won't attach cw20s because we had some unused balance from the last creation
@@ -599,7 +618,7 @@ fn create_task() -> anyhow::Result<()> {
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 3);
 
     Ok(())
@@ -651,7 +670,7 @@ fn refill_task() -> anyhow::Result<()> {
     };
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     let task_hash = active_tasks[0].clone();
 
     let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
@@ -740,6 +759,7 @@ fn remove_task() -> anyhow::Result<()> {
         mock,
         account,
         cw20_addr,
+        abstr_deployment,
         ..
     } = setup()?;
 
@@ -815,7 +835,15 @@ fn remove_task() -> anyhow::Result<()> {
     // One of them will be removed by the agent
     let removed_task_hash = {
         mock.wait_blocks(3)?;
-        let factory_addr: Addr = module_contract.config()?.config.factory_addr;
+        let contracts_response: ContractsResponse =
+            abstr_deployment
+                .ans_host
+                .query(&abstract_core::ans_host::QueryMsg::Contracts {
+                    entries: vec![
+                        UncheckedContractEntry::try_from(CRON_CAT_FACTORY.to_owned())?.into(),
+                    ],
+                })?;
+        let factory_addr: Addr = contracts_response.contracts[0].1.clone();
         let response: ContractMetadataResponse = mock.query(
             &FactoryQueryMsg::LatestContract {
                 contract_name: MANAGER_NAME.to_string(),
@@ -847,7 +875,7 @@ fn remove_task() -> anyhow::Result<()> {
     };
 
     // Note: not updated
-    let mut active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let mut active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
     active_tasks.retain(|task_hash| task_hash != &removed_task_hash);

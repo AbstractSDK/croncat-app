@@ -9,18 +9,14 @@ abstract_app::app_messages!(CroncatApp, AppExecuteMsg, AppQueryMsg);
 
 /// App instantiate message
 #[cosmwasm_schema::cw_serde]
-pub struct AppInstantiateMsg {
-    pub factory_addr: String,
-}
+pub struct AppInstantiateMsg {}
 
 /// App execute messages
 #[cosmwasm_schema::cw_serde]
 #[cfg_attr(feature = "interface", derive(cw_orch::ExecuteFns))]
 #[cfg_attr(feature = "interface", impl_into(ExecuteMsg))]
 pub enum AppExecuteMsg {
-    UpdateConfig {
-        factory_addr: String,
-    },
+    UpdateConfig {},
     CreateTask {
         task: Box<CronCatTaskRequest>,
         assets: AssetListUnchecked,
@@ -42,7 +38,10 @@ pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(Vec<String>)]
-    ActiveTasks {},
+    ActiveTasks {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
     TaskInfo { task_hash: String },
     #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]
