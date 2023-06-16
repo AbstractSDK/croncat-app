@@ -44,7 +44,8 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         self.base.modules(self.deps).module_address(self.module_id)
     }
     /// Create task
-    /// On success it will return task_hash in reply data, you can save it in dependent module.
+    /// On success it will return [`croncat_integration_utils::CronCatTaskExecutionInfo`] in reply data, 
+    /// you can save task_hash or any other useful information in dependent module.
     /// This way you can track which tasks were created only by this module
     pub fn create_task(
         &self,

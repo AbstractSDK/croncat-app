@@ -101,7 +101,7 @@ fn create_task(
     )?
     .into();
     let create_task_submessage = executor.execute_with_reply_and_data(
-        create_task_msg.into(),
+        create_task_msg,
         ReplyOn::Success,
         TASK_CREATE_REPLY_ID,
     )?;
