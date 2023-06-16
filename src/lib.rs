@@ -1,3 +1,4 @@
+mod api;
 pub mod contract;
 pub mod error;
 mod handlers;
@@ -11,3 +12,5 @@ pub mod state;
 pub use interface::App;
 #[cfg(feature = "interface")]
 pub use msg::{AppExecuteMsgFns, AppQueryMsgFns};
+
+pub use api::CronCat;

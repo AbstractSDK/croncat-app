@@ -50,7 +50,10 @@ pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     #[returns(Vec<String>)]
-    ActiveTasks {},
+    ActiveTasks {
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
     TaskInfo { task_hash: String },
     #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]

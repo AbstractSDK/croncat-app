@@ -53,3 +53,27 @@ pub(crate) fn check_users_balance_nonempty(
     )?;
     Ok(!coins.is_empty())
 }
+
+pub(crate) fn sort_funds(
+    deps: cosmwasm_std::Deps,
+    assets: cw_asset::AssetListUnchecked,
+) -> Result<(Vec<cosmwasm_std::Coin>, Vec<cw20::Cw20CoinVerified>), cw_asset::AssetError> {
+    let assets = assets.check(deps.api, None)?;
+    let (funds, cw20s) =
+        assets
+            .into_iter()
+            .fold((vec![], vec![]), |(mut funds, mut cw20s), asset| {
+                match &asset.info {
+                    cw_asset::AssetInfoBase::Native(denom) => {
+                        funds.push(cosmwasm_std::coin(asset.amount.u128(), denom))
+                    }
+                    cw_asset::AssetInfoBase::Cw20(address) => cw20s.push(cw20::Cw20CoinVerified {
+                        address: address.clone(),
+                        amount: asset.amount,
+                    }),
+                    _ => todo!(),
+                }
+                (funds, cw20s)
+            });
+    Ok((funds, cw20s))
+}

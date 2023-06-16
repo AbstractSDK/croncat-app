@@ -9,45 +9,23 @@ use abstract_sdk::{
     Execution,
 };
 use cosmwasm_std::{wasm_execute, CosmosMsg, DepsMut, Env, Reply, Response};
+use croncat_integration_utils::reply_handler::reply_handle_croncat_task_creation;
 use croncat_sdk_manager::msg::ManagerExecuteMsg;
 
 pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply) -> CroncatResult {
-    // TODO: https://github.com/AbstractSDK/contracts/issues/364
-    // let (task, _bin) = reply_handle_croncat_task_creation(reply)?;
+    let (task, bin) = reply_handle_croncat_task_creation(reply)?;
 
-    let events = reply.result.unwrap().events;
-    let create_task_event = events
-        .into_iter()
-        .find(|ev| {
-            ev.ty == "wasm"
-                && ev
-                    .attributes
-                    .iter()
-                    .any(|attr| attr.key == "action" && attr.value == "create_task")
-        })
-        .unwrap();
-    let task_hash = create_task_event
-        .attributes
-        .iter()
-        .find(|&attr| attr.key == "task_hash")
-        .unwrap()
-        .value
-        .clone();
-    let task_version = create_task_event
-        .attributes
-        .into_iter()
-        .find(|attr| attr.key == "task_version")
-        .unwrap()
-        .value;
-    ACTIVE_TASKS.update(deps.storage, &task_hash, |ver| match ver {
+    ACTIVE_TASKS.update(deps.storage, &task.task_hash, |ver| match ver {
         Some(_) => Err(AppError::TaskAlreadyExists {
-            task_hash: task_hash.clone(),
+            task_hash: task.task_hash.clone(),
         }),
-        None => Ok(task_version),
+        None => Ok(task.version),
     })?;
 
     Ok(app.tag_response(
-        Response::new().add_attribute("task_hash", task_hash),
+        Response::new()
+            .add_attribute("task_hash", task.task_hash)
+            .set_data(bin),
         "create_task_reply",
     ))
 }
