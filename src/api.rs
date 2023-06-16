@@ -1,13 +1,17 @@
-use abstract_core::objects::{module::ModuleId, AssetEntry};
-use abstract_sdk::AdapterInterface;
+use abstract_core::objects::module::ModuleId;
+use abstract_sdk::ModuleInterface;
 use abstract_sdk::{
     features::{AccountIdentification, Dependencies},
     AbstractSdkResult,
 };
-use cosmwasm_std::{CosmosMsg, Decimal, Deps, Uint128};
+use cosmwasm_std::{wasm_execute, Addr, CosmosMsg, Deps};
 use croncat_integration_utils::CronCatTaskRequest;
+use croncat_sdk_manager::types::TaskBalanceResponse;
+use croncat_sdk_tasks::types::TaskResponse;
+use cw_asset::AssetListUnchecked;
 
 use crate::contract::CRONCAT_ID;
+use crate::msg::{AppExecuteMsg, AppQueryMsg};
 
 // Entry for the cron_cat factory address, stored in the ANS
 pub const CRON_CAT_FACTORY: &str = "croncat:factory";
@@ -35,23 +39,80 @@ pub struct CronCat<'a, T: CronCatInterface> {
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
-    /// Swap assets in the cron_cat
+    /// Get address of this module
+    pub fn module_address(&self) -> AbstractSdkResult<Addr> {
+        self.base.modules(self.deps).module_address(self.module_id)
+    }
+    /// Create task
+    /// On success it will return task_hash in reply data, you can save it in dependent module.
+    /// This way you can track which tasks were created only by this module
     pub fn create_task(
         &self,
         task: CronCatTaskRequest,
+        assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
-        todo!("logic that creates a task")
+        Ok(wasm_execute(
+            self.module_address()?,
+            &AppExecuteMsg::CreateTask {
+                task: Box::new(task),
+                assets,
+            },
+            vec![],
+        )?
+        .into())
     }
 
-    
+    /// Refill a task's balance messages
+    pub fn refill_task(
+        &self,
+        task_hash: String,
+        assets: AssetListUnchecked,
+    ) -> AbstractSdkResult<CosmosMsg> {
+        Ok(wasm_execute(
+            self.module_address()?,
+            &AppExecuteMsg::RefillTask { task_hash, assets },
+            vec![],
+        )?
+        .into())
+    }
+
+    pub fn remove_task(&self, task_hash: String) -> AbstractSdkResult<CosmosMsg> {
+        Ok(wasm_execute(
+            self.module_address()?,
+            &AppExecuteMsg::RemoveTask { task_hash },
+            vec![],
+        )?
+        .into())
+    }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
-    /// task_information
-    pub fn query_task_information(
+    /// Task information
+    pub fn query_task_information(&self, task_hash: String) -> AbstractSdkResult<TaskResponse> {
+        Ok(self
+            .deps
+            .querier
+            .query_wasm_smart(self.module_address()?, &AppQueryMsg::TaskInfo { task_hash })?)
+    }
+
+    /// Task balance
+    pub fn query_task_balance(&self, task_hash: String) -> AbstractSdkResult<TaskBalanceResponse> {
+        Ok(self.deps.querier.query_wasm_smart(
+            self.module_address()?,
+            &AppQueryMsg::TaskBalance { task_hash },
+        )?)
+    }
+
+    /// Active tasks
+    pub fn query_active_tasks(
         &self,
-    ) -> AbstractSdkResult<()> {
-        todo!("logic that queries task information")
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> AbstractSdkResult<Vec<String>> {
+        Ok(self.deps.querier.query_wasm_smart(
+            self.module_address()?,
+            &AppQueryMsg::ActiveTasks { start_after, limit },
+        )?)
     }
 }
 

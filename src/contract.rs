@@ -54,26 +54,26 @@ pub(crate) fn check_users_balance_nonempty(
     Ok(!coins.is_empty())
 }
 
-pub(crate) fn get_croncat_contract(
-    querier: &cosmwasm_std::QuerierWrapper,
-    croncat_factory_address: cosmwasm_std::Addr,
-    croncat_contract_name: &str,
-    croncat_version: &str,
-) -> cosmwasm_std::StdResult<cosmwasm_std::Addr> {
-    // Parse string to a version.
-    let croncat_version_parsed = croncat_version
-        .split('.')
-        .map(|ver| ver.parse().unwrap())
-        .collect::<Vec<u8>>();
-
-    // Raw query the factory
-    let contract_addr = croncat_factory::state::CONTRACT_ADDRS
-        .query(
-            querier,
-            croncat_factory_address,
-            (croncat_contract_name, &croncat_version_parsed),
-        )?
-        .unwrap();
-
-    Ok(contract_addr)
+pub(crate) fn sort_funds(
+    deps: cosmwasm_std::Deps,
+    assets: cw_asset::AssetListUnchecked,
+) -> Result<(Vec<cosmwasm_std::Coin>, Vec<cw20::Cw20CoinVerified>), cw_asset::AssetError> {
+    let assets = assets.check(deps.api, None)?;
+    let (funds, cw20s) =
+        assets
+            .into_iter()
+            .fold((vec![], vec![]), |(mut funds, mut cw20s), asset| {
+                match &asset.info {
+                    cw_asset::AssetInfoBase::Native(denom) => {
+                        funds.push(cosmwasm_std::coin(asset.amount.u128(), denom))
+                    }
+                    cw_asset::AssetInfoBase::Cw20(address) => cw20s.push(cw20::Cw20CoinVerified {
+                        address: address.clone(),
+                        amount: asset.amount,
+                    }),
+                    _ => todo!(),
+                }
+                (funds, cw20s)
+            });
+    Ok((funds, cw20s))
 }

@@ -1,12 +1,14 @@
-use crate::contract::{get_croncat_contract, CroncatApp, CroncatResult};
+use crate::contract::{CroncatApp, CroncatResult};
 use crate::msg::{AppQueryMsg, ConfigResponse};
 use crate::state::{ACTIVE_TASKS, CONFIG};
 use cosmwasm_std::{to_binary, Binary, Deps, Env, StdResult};
+use croncat_integration_utils::task_creation::get_croncat_contract;
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_manager::msg::ManagerQueryMsg;
 use croncat_sdk_manager::types::TaskBalanceResponse;
 use croncat_sdk_tasks::msg::TasksQueryMsg;
 use croncat_sdk_tasks::types::TaskResponse;
+use cw_storage_plus::Bound;
 
 pub fn query_handler(
     deps: Deps,
@@ -16,7 +18,9 @@ pub fn query_handler(
 ) -> CroncatResult<Binary> {
     match msg {
         AppQueryMsg::Config {} => to_binary(&query_config(deps)?),
-        AppQueryMsg::ActiveTasks {} => to_binary(&query_active_tasks(deps)?),
+        AppQueryMsg::ActiveTasks { start_after, limit } => {
+            to_binary(&query_active_tasks(deps, start_after, limit)?)
+        }
         AppQueryMsg::TaskInfo { task_hash } => to_binary(&query_task_info(deps, task_hash)?),
         AppQueryMsg::TaskBalance { task_hash } => to_binary(&query_task_balance(deps, task_hash)?),
     }
@@ -28,11 +32,21 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse { config })
 }
 
-// TODO: pagination
-fn query_active_tasks(deps: Deps) -> StdResult<Vec<String>> {
-    ACTIVE_TASKS
-        .keys(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .collect()
+fn query_active_tasks(
+    deps: Deps,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<Vec<String>> {
+    let keys = ACTIVE_TASKS.keys(
+        deps.storage,
+        start_after.as_deref().map(Bound::exclusive),
+        None,
+        cosmwasm_std::Order::Ascending,
+    );
+    match limit {
+        Some(limit) => keys.take(limit as usize).collect(),
+        None => keys.collect(),
+    }
 }
 
 fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
@@ -41,9 +55,10 @@ fn query_task_info(deps: Deps, task_hash: String) -> StdResult<TaskResponse> {
     let tasks_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr,
-        TASKS_NAME,
-        &task_version,
-    )?;
+        TASKS_NAME.to_owned(),
+        task_version,
+    )
+    .unwrap();
 
     let task_info: TaskResponse = deps
         .querier
@@ -57,9 +72,10 @@ fn query_task_balance(deps: Deps, task_hash: String) -> StdResult<TaskBalanceRes
     let manager_addr = get_croncat_contract(
         &deps.querier,
         config.factory_addr,
-        MANAGER_NAME,
-        &task_version,
-    )?;
+        MANAGER_NAME.to_owned(),
+        task_version,
+    )
+    .unwrap();
 
     let task_balance: TaskBalanceResponse = deps
         .querier
