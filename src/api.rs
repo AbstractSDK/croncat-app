@@ -44,7 +44,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         self.base.modules(self.deps).module_address(self.module_id)
     }
     /// Create task
-    /// On success it will return [`croncat_integration_utils::CronCatTaskExecutionInfo`] in reply data, 
+    /// On success it will return [`croncat_integration_utils::CronCatTaskExecutionInfo`] in reply data,
     /// you can save task_hash or any other useful information in dependent module.
     /// This way you can track which tasks were created only by this module
     pub fn create_task(
@@ -64,265 +64,195 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Refill a task's balance messages
     pub fn refill_task(
         &self,
-        task_hash: String,
+        task_hash: impl Into<String>,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
         self.base.apps(self.deps).request(
             self.module_id,
-            AppExecuteMsg::RefillTask { task_hash, assets },
+            AppExecuteMsg::RefillTask {
+                task_hash: task_hash.into(),
+                assets,
+            },
         )
     }
 
-    pub fn remove_task(&self, task_hash: String) -> AbstractSdkResult<CosmosMsg> {
-        self.base
-            .apps(self.deps)
-            .request(self.module_id, AppExecuteMsg::RemoveTask { task_hash })
+    pub fn remove_task(&self, task_hash: impl Into<String>) -> AbstractSdkResult<CosmosMsg> {
+        self.base.apps(self.deps).request(
+            self.module_id,
+            AppExecuteMsg::RemoveTask {
+                task_hash: task_hash.into(),
+            },
+        )
     }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Task information
-    pub fn query_task_information(&self, task_hash: String) -> AbstractSdkResult<TaskResponse> {
-        self.base
-            .apps(self.deps)
-            .query(self.module_id, AppQueryMsg::TaskInfo { task_hash })
+    pub fn query_task_information(
+        &self,
+        task_hash: impl Into<String>,
+    ) -> AbstractSdkResult<TaskResponse> {
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::TaskInfo {
+                task_hash: task_hash.into(),
+            },
+        )
     }
 
     /// Task balance
-    pub fn query_task_balance(&self, task_hash: String) -> AbstractSdkResult<TaskBalanceResponse> {
-        self.base
-            .apps(self.deps)
-            .query(self.module_id, AppQueryMsg::TaskBalance { task_hash })
+    pub fn query_task_balance(
+        &self,
+        task_hash: impl Into<String>,
+    ) -> AbstractSdkResult<TaskBalanceResponse> {
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::TaskBalance {
+                task_hash: task_hash.into(),
+            },
+        )
     }
 
     /// Active tasks
     pub fn query_active_tasks(
         &self,
-        start_after: Option<String>,
+        start_after: Option<impl Into<String>>,
         limit: Option<u32>,
     ) -> AbstractSdkResult<Vec<String>> {
         self.base.apps(self.deps).query(
             self.module_id,
-            AppQueryMsg::ActiveTasks { start_after, limit },
+            AppQueryMsg::ActiveTasks {
+                start_after: start_after.map(Into::into),
+                limit,
+            },
         )
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-//     use crate::msg::ExecuteMsg;
-//     use abstract_core::adapter::AdapterRequestMsg;
-//     use abstract_sdk::mock_module::MockModule;
-//     use cosmwasm_std::testing::mock_dependencies;
-//     use cosmwasm_std::wasm_execute;
-//     use speculoos::prelude::*;
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::msg::ExecuteMsg;
+    use abstract_sdk::mock_module::MockModule;
+    use abstract_testing::prelude::TEST_MODULE_ID;
+    use cosmwasm_std::testing::mock_dependencies;
+    use cosmwasm_std::{coins, wasm_execute, BankMsg};
+    use croncat_integration_utils::*;
+    use cw_asset::AssetList;
+    use speculoos::prelude::*;
 
-//     #[test]
-//     fn swap_msg() {
-//         let mut deps = mock_dependencies();
-//         deps.querier = abstract_testing::mock_querier();
-//         let stub = MockModule::new();
-//         let cron_cat = stub
-//             .cron_cat(deps.as_ref(), "junoswap".into())
-//             .with_module_id(abstract_testing::prelude::TEST_MODULE_ID);
+    const TEST_TASK_HASH: &str = "juno:564d9acab76c256659634415d14625812103bc8e87308c5c3c290045e17";
+    #[test]
+    fn create_task_msg() {
+        let mut deps = mock_dependencies();
+        deps.querier = abstract_testing::mock_querier();
+        let stub = MockModule::new();
+        let mut cron_cat = stub.cron_cat(deps.as_ref());
+        cron_cat.module_id = TEST_MODULE_ID;
 
-//         let cron_cat_name = "junoswap".to_string();
-//         let offer_asset = OfferAsset::new("juno", 1000u128);
-//         let ask_asset = AssetEntry::new("uusd");
-//         let max_spread = Some(Decimal::percent(1));
-//         let belief_price = Some(Decimal::percent(2));
+        let task = CronCatTaskRequest {
+            interval: CronCatInterval::Once,
+            boundary: None,
+            stop_on_fail: false,
+            actions: vec![CronCatAction {
+                msg: BankMsg::Send {
+                    to_address: "bob".to_owned(),
+                    amount: coins(10, "juno"),
+                }
+                .into(),
+                gas_limit: None,
+            }],
+            queries: None,
+            transforms: None,
+            cw20: None,
+        };
+        let assets: AssetListUnchecked = AssetList::from(coins(10, "juno")).into();
+        let expected = ExecuteMsg::from(AppExecuteMsg::CreateTask {
+            task: Box::new(task.clone()),
+            assets: assets.clone(),
+        });
 
-//         let expected = expected_request_with_test_proxy(CronCatExecuteMsg::Action {
-//             cron_cat: cron_cat_name,
-//             action: CronCatAction::Swap {
-//                 offer_asset: offer_asset.clone(),
-//                 ask_asset: ask_asset.clone(),
-//                 max_spread,
-//                 belief_price,
-//             },
-//         });
+        let actual = cron_cat.create_task(task, assets);
 
-//         let actual = cron_cat.swap(offer_asset, ask_asset, max_spread, belief_price);
+        assert_that!(actual).is_ok();
 
-//         assert_that!(actual).is_ok();
+        let actual = match actual.unwrap() {
+            CosmosMsg::Wasm(msg) => msg,
+            _ => panic!("expected wasm msg"),
+        };
+        let expected = wasm_execute(
+            abstract_testing::prelude::TEST_MODULE_ADDRESS,
+            &expected,
+            vec![],
+        )
+        .unwrap();
 
-//         let actual = match actual.unwrap() {
-//             CosmosMsg::Wasm(msg) => msg,
-//             _ => panic!("expected wasm msg"),
-//         };
-//         let expected = wasm_execute(
-//             abstract_testing::prelude::TEST_MODULE_ADDRESS,
-//             &expected,
-//             vec![],
-//         )
-//         .unwrap();
+        assert_that!(actual).is_equal_to(expected);
+    }
 
-//         assert_that!(actual).is_equal_to(expected);
-//     }
+    #[test]
+    fn refill_task_msg() {
+        let mut deps = mock_dependencies();
+        deps.querier = abstract_testing::mock_querier();
+        let stub = MockModule::new();
+        let mut cron_cat = stub.cron_cat(deps.as_ref());
+        cron_cat.module_id = TEST_MODULE_ID;
 
-//     #[test]
-//     fn custom_swap_msg() {
-//         let mut deps = mock_dependencies();
-//         deps.querier = abstract_testing::mock_querier();
-//         let stub = MockModule::new();
-//         let cron_cat_name = "astroport".to_string();
+        let task_hash = TEST_TASK_HASH;
 
-//         let cron_cat = stub
-//             .cron_cat(deps.as_ref(), cron_cat_name.clone())
-//             .with_module_id(abstract_testing::prelude::TEST_MODULE_ID);
+        let assets: AssetListUnchecked = AssetList::from(coins(10, "juno")).into();
+        let expected = ExecuteMsg::from(AppExecuteMsg::RefillTask {
+            task_hash: task_hash.to_owned(),
+            assets: assets.clone(),
+        });
 
-//         let offer_assets = vec![OfferAsset::new("juno", 1000u128)];
-//         let ask_assets = vec![AskAsset::new("uusd", 1000u128)];
-//         let max_spread = Some(Decimal::percent(1));
-//         let router = Some(SwapRouter::Custom("custom_router".to_string()));
+        let actual = cron_cat.refill_task(task_hash, assets);
 
-//         let expected = expected_request_with_test_proxy(CronCatExecuteMsg::Action {
-//             cron_cat: cron_cat_name,
-//             action: CronCatAction::CustomSwap {
-//                 offer_assets: offer_assets.clone(),
-//                 ask_assets: ask_assets.clone(),
-//                 max_spread,
-//                 router: router.clone(),
-//             },
-//         });
+        assert_that!(actual).is_ok();
 
-//         let actual = cron_cat.custom_swap(offer_assets, ask_assets, max_spread, router);
+        let actual = match actual.unwrap() {
+            CosmosMsg::Wasm(msg) => msg,
+            _ => panic!("expected wasm msg"),
+        };
+        let expected = wasm_execute(
+            abstract_testing::prelude::TEST_MODULE_ADDRESS,
+            &expected,
+            vec![],
+        )
+        .unwrap();
 
-//         assert_that!(actual).is_ok();
+        assert_that!(actual).is_equal_to(expected);
+    }
 
-//         let actual = match actual.unwrap() {
-//             CosmosMsg::Wasm(msg) => msg,
-//             _ => panic!("expected wasm msg"),
-//         };
-//         let expected = wasm_execute(
-//             abstract_testing::prelude::TEST_MODULE_ADDRESS,
-//             &expected,
-//             vec![],
-//         )
-//         .unwrap();
+    #[test]
+    fn remove_task_msg() {
+        let mut deps = mock_dependencies();
+        deps.querier = abstract_testing::mock_querier();
+        let stub = MockModule::new();
+        let mut cron_cat = stub.cron_cat(deps.as_ref());
+        cron_cat.module_id = TEST_MODULE_ID;
 
-//         assert_that!(actual).is_equal_to(expected);
-//     }
+        let task_hash = TEST_TASK_HASH;
 
-//     #[test]
-//     fn provide_liquidity_msg() {
-//         let mut deps = mock_dependencies();
-//         deps.querier = abstract_testing::mock_querier();
-//         let stub = MockModule::new();
-//         let cron_cat_name = "junoswap".to_string();
+        let expected = ExecuteMsg::from(AppExecuteMsg::RemoveTask {
+            task_hash: task_hash.to_owned(),
+        });
 
-//         let cron_cat = stub
-//             .cron_cat(deps.as_ref(), cron_cat_name.clone())
-//             .with_module_id(abstract_testing::prelude::TEST_MODULE_ID);
+        let actual = cron_cat.remove_task(task_hash);
 
-//         let assets = vec![OfferAsset::new("taco", 1000u128)];
-//         let max_spread = Some(Decimal::percent(1));
+        assert_that!(actual).is_ok();
 
-//         let expected = expected_request_with_test_proxy(CronCatExecuteMsg::Action {
-//             cron_cat: cron_cat_name,
-//             action: CronCatAction::ProvideLiquidity {
-//                 assets: assets.clone(),
-//                 max_spread,
-//             },
-//         });
+        let actual = match actual.unwrap() {
+            CosmosMsg::Wasm(msg) => msg,
+            _ => panic!("expected wasm msg"),
+        };
+        let expected = wasm_execute(
+            abstract_testing::prelude::TEST_MODULE_ADDRESS,
+            &expected,
+            vec![],
+        )
+        .unwrap();
 
-//         let actual = cron_cat.provide_liquidity(assets, max_spread);
-
-//         assert_that!(actual).is_ok();
-
-//         let actual = match actual.unwrap() {
-//             CosmosMsg::Wasm(msg) => msg,
-//             _ => panic!("expected wasm msg"),
-//         };
-//         let expected = wasm_execute(
-//             abstract_testing::prelude::TEST_MODULE_ADDRESS,
-//             &expected,
-//             vec![],
-//         )
-//         .unwrap();
-
-//         assert_that!(actual).is_equal_to(expected);
-//     }
-
-//     #[test]
-//     fn provide_liquidity_symmetric_msg() {
-//         let mut deps = mock_dependencies();
-//         deps.querier = abstract_testing::mock_querier();
-//         let stub = MockModule::new();
-//         let cron_cat_name = "junoswap".to_string();
-
-//         let cron_cat = stub
-//             .cron_cat(deps.as_ref(), cron_cat_name.clone())
-//             .with_module_id(abstract_testing::prelude::TEST_MODULE_ID);
-
-//         let offer = OfferAsset::new("taco", 1000u128);
-//         let paired = vec![AssetEntry::new("bell")];
-//         let _max_spread = Some(Decimal::percent(1));
-
-//         let expected = expected_request_with_test_proxy(CronCatExecuteMsg::Action {
-//             cron_cat: cron_cat_name,
-//             action: CronCatAction::ProvideLiquiditySymmetric {
-//                 offer_asset: offer.clone(),
-//                 paired_assets: paired.clone(),
-//             },
-//         });
-
-//         let actual = cron_cat.provide_liquidity_symmetric(offer, paired);
-
-//         assert_that!(actual).is_ok();
-
-//         let actual = match actual.unwrap() {
-//             CosmosMsg::Wasm(msg) => msg,
-//             _ => panic!("expected wasm msg"),
-//         };
-//         let expected = wasm_execute(
-//             abstract_testing::prelude::TEST_MODULE_ADDRESS,
-//             &expected,
-//             vec![],
-//         )
-//         .unwrap();
-
-//         assert_that!(actual).is_equal_to(expected);
-//     }
-
-//     #[test]
-//     fn withdraw_liquidity_msg() {
-//         let mut deps = mock_dependencies();
-//         deps.querier = abstract_testing::mock_querier();
-//         let stub = MockModule::new();
-//         let cron_cat_name = "junoswap".to_string();
-
-//         let cron_cat = stub
-//             .cron_cat(deps.as_ref(), cron_cat_name.clone())
-//             .with_module_id(abstract_testing::prelude::TEST_MODULE_ID);
-
-//         let lp_token = AssetEntry::new("taco");
-//         let withdraw_amount: Uint128 = 1000u128.into();
-
-//         let expected = expected_request_with_test_proxy(CronCatExecuteMsg::Action {
-//             cron_cat: cron_cat_name,
-//             action: CronCatAction::WithdrawLiquidity {
-//                 lp_token: lp_token.clone(),
-//                 amount: withdraw_amount,
-//             },
-//         });
-
-//         let actual = cron_cat.withdraw_liquidity(lp_token, withdraw_amount);
-
-//         assert_that!(actual).is_ok();
-
-//         let actual = match actual.unwrap() {
-//             CosmosMsg::Wasm(msg) => msg,
-//             _ => panic!("expected wasm msg"),
-//         };
-//         let expected = wasm_execute(
-//             abstract_testing::prelude::TEST_MODULE_ADDRESS,
-//             &expected,
-//             vec![],
-//         )
-//         .unwrap();
-
-//         assert_that!(actual).is_equal_to(expected);
-//     }
-// }
+        assert_that!(actual).is_equal_to(expected);
+    }
+}
