@@ -45,18 +45,18 @@ cosmwasm-schema = { version = "1.2" }
 cw20 = { version = "0.16.0" }
 
 cw-controllers = { version = "1.0.1" }
-cw-storage-plus = "1.0.1"
+cw-storage-plus = "1.1.0"
 thiserror = { version = "1.0" }
 schemars = "0.8"
 cw-asset = { version = "3.0" }
 
-abstract-core = { version = "0.15.3" }
-abstract-app = { version = "0.15.3" }
-abstract-sdk = { version = "0.15.3" }
+abstract-core = { version = "0.16.1" }
+abstract-app = { version = "0.16.1" }
+abstract-sdk = { version = "0.16.1" }
 
 # Dependencies for interface
-abstract-interface = { version = "0.15.3", optional = true }
-cw-orch = { version = "0.12", optional = true }
+abstract-interface = { version = "0.16.1", optional = true }
+cw-orch = { version = "0.13.0", optional = true }
 
 # Croncat dependencies
 croncat-sdk-factory = "1.0.3"
@@ -68,14 +68,14 @@ croncat-factory = { version = "1.0.3", features = ["library"]}
 
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }
-abstract-interface = { version = "0.15.3", features = ["daemon"] }
-abstract-testing = { version = "0.15.3" }
-abstract-sdk = { version = "0.15.3", features = ["test-utils"] }
+abstract-interface = { version = "0.16.1", features = ["daemon"] }
+abstract-testing = { version = "0.16.1" }
+abstract-sdk = { version = "0.16.1", features = ["test-utils"] }
 speculoos = "0.11.0"
 semver = "1.0"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
-cw-orch = { version = "0.12", features = ["daemon"] }
+cw-orch = { version = "0.13.0", features = ["daemon"] }
 cw-multi-test = "0.16.4"
 
 # Croncat intefraces
