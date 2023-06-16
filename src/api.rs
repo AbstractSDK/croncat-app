@@ -1,10 +1,10 @@
 use abstract_core::objects::module::ModuleId;
-use abstract_sdk::ModuleInterface;
 use abstract_sdk::{
     features::{AccountIdentification, Dependencies},
     AbstractSdkResult,
 };
-use cosmwasm_std::{wasm_execute, Addr, CosmosMsg, Deps};
+use abstract_sdk::{AppInterface, ModuleInterface};
+use cosmwasm_std::{Addr, CosmosMsg, Deps};
 use croncat_integration_utils::CronCatTaskRequest;
 use croncat_sdk_manager::types::TaskBalanceResponse;
 use croncat_sdk_tasks::types::TaskResponse;
@@ -51,15 +51,13 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         task: CronCatTaskRequest,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
-        Ok(wasm_execute(
-            self.module_address()?,
-            &AppExecuteMsg::CreateTask {
+        self.base.apps(self.deps).request(
+            self.module_id,
+            AppExecuteMsg::CreateTask {
                 task: Box::new(task),
                 assets,
             },
-            vec![],
-        )?
-        .into())
+        )
     }
 
     /// Refill a task's balance messages
@@ -68,39 +66,32 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         task_hash: String,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
-        Ok(wasm_execute(
-            self.module_address()?,
-            &AppExecuteMsg::RefillTask { task_hash, assets },
-            vec![],
-        )?
-        .into())
+        self.base.apps(self.deps).request(
+            self.module_id,
+            AppExecuteMsg::RefillTask { task_hash, assets },
+        )
     }
 
     pub fn remove_task(&self, task_hash: String) -> AbstractSdkResult<CosmosMsg> {
-        Ok(wasm_execute(
-            self.module_address()?,
-            &AppExecuteMsg::RemoveTask { task_hash },
-            vec![],
-        )?
-        .into())
+        self.base
+            .apps(self.deps)
+            .request(self.module_id, AppExecuteMsg::RemoveTask { task_hash })
     }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Task information
     pub fn query_task_information(&self, task_hash: String) -> AbstractSdkResult<TaskResponse> {
-        Ok(self
-            .deps
-            .querier
-            .query_wasm_smart(self.module_address()?, &AppQueryMsg::TaskInfo { task_hash })?)
+        self.base
+            .apps(self.deps)
+            .query(self.module_id, AppQueryMsg::TaskInfo { task_hash })
     }
 
     /// Task balance
     pub fn query_task_balance(&self, task_hash: String) -> AbstractSdkResult<TaskBalanceResponse> {
-        Ok(self.deps.querier.query_wasm_smart(
-            self.module_address()?,
-            &AppQueryMsg::TaskBalance { task_hash },
-        )?)
+        self.base
+            .apps(self.deps)
+            .query(self.module_id, AppQueryMsg::TaskBalance { task_hash })
     }
 
     /// Active tasks
@@ -109,10 +100,10 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         start_after: Option<String>,
         limit: Option<u32>,
     ) -> AbstractSdkResult<Vec<String>> {
-        Ok(self.deps.querier.query_wasm_smart(
-            self.module_address()?,
-            &AppQueryMsg::ActiveTasks { start_after, limit },
-        )?)
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::ActiveTasks { start_after, limit },
+        )
     }
 }
 
