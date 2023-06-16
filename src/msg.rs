@@ -1,19 +1,11 @@
-use abstract_core::app;
-use abstract_sdk::base::{ExecuteEndpoint, InstantiateEndpoint, MigrateEndpoint, QueryEndpoint};
 use cosmwasm_schema::QueryResponses;
 use croncat_integration_utils::CronCatTaskRequest;
 use cw_asset::AssetListUnchecked;
 
 use crate::{contract::CroncatApp, state::Config};
 
-/// Abstract App instantiate msg
-pub type InstantiateMsg = <CroncatApp as InstantiateEndpoint>::InstantiateMsg;
-pub type ExecuteMsg = <CroncatApp as ExecuteEndpoint>::ExecuteMsg;
-pub type QueryMsg = <CroncatApp as QueryEndpoint>::QueryMsg;
-pub type MigrateMsg = <CroncatApp as MigrateEndpoint>::MigrateMsg;
-
-impl app::AppExecuteMsg for AppExecuteMsg {}
-impl app::AppQueryMsg for AppQueryMsg {}
+// Expose the top-level app messages
+abstract_app::app_messages!(CroncatApp, AppExecuteMsg, AppQueryMsg);
 
 /// App instantiate message
 #[cosmwasm_schema::cw_serde]

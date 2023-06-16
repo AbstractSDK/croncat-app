@@ -22,7 +22,7 @@ pub type CroncatResult<T = Response> = Result<T, AppError>;
 pub type CroncatApp =
     AppContract<AppError, AppInstantiateMsg, AppExecuteMsg, AppQueryMsg, AppMigrateMsg>;
 
-const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSION, None)
+pub const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSION, None)
     .with_instantiate(handlers::instantiate_handler)
     .with_execute(handlers::execute_handler)
     .with_query(handlers::query_handler)
@@ -37,6 +37,10 @@ const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSI
 #[cfg(feature = "export")]
 abstract_app::export_endpoints!(CRONCAT_APP, CroncatApp);
 
+#[cfg(feature = "interface")]
+abstract_app::create_interface!(CRONCAT_APP, CroncatApp);
+
+// Small helper
 // Small helpers
 // TODO: should be able to move those somewhere
 pub(crate) fn check_users_balance_nonempty(
