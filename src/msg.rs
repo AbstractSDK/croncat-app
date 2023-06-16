@@ -1,4 +1,3 @@
-use abstract_sdk::base::QueryEndpoint;
 use cosmwasm_schema::QueryResponses;
 use croncat_integration_utils::CronCatTaskRequest;
 use cw_asset::AssetListUnchecked;

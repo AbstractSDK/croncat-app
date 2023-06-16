@@ -255,6 +255,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
                 factory_addr: factory_addr.into_string(),
             },
         },
+        None,
     )?;
 
     let module_addr = account.manager.module_info(CRONCAT_ID)?.unwrap().address;
