@@ -100,8 +100,8 @@ fn create_task(
         funds,
     )?
     .into();
-    let create_task_submessage = executor.execute_with_reply(
-        vec![create_task_msg.into()],
+    let create_task_submessage = executor.execute_with_reply_and_data(
+        create_task_msg.into(),
         ReplyOn::Success,
         TASK_CREATE_REPLY_ID,
     )?;
