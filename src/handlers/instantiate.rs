@@ -9,12 +9,9 @@ pub fn instantiate_handler(
     _env: Env,
     _info: MessageInfo,
     _app: CroncatApp,
-    msg: AppInstantiateMsg,
+    _msg: AppInstantiateMsg,
 ) -> CroncatResult {
-    let factory_addr = deps.api.addr_validate(&msg.factory_addr)?;
-    let config: Config = Config { factory_addr };
-
-    CONFIG.save(deps.storage, &config)?;
+    CONFIG.save(deps.storage, &Config {})?;
 
     Ok(Response::new())
 }

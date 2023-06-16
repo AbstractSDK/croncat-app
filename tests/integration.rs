@@ -2,13 +2,18 @@ mod common;
 
 use std::cell::RefMut;
 
-use abstract_core::{app::BaseInstantiateMsg, objects::gov_type::GovernanceDetails};
+use abstract_core::{
+    ans_host::ContractsResponse,
+    app::BaseInstantiateMsg,
+    objects::{gov_type::GovernanceDetails, UncheckedContractEntry},
+};
 use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
     msg::{AppInstantiateMsg, ConfigResponse, InstantiateMsg},
-    App, AppExecuteMsgFns, AppQueryMsgFns,
+    state::Config,
+    App, AppExecuteMsgFns, AppQueryMsgFns, CRON_CAT_FACTORY,
 };
 use common::contracts;
 
@@ -244,6 +249,15 @@ fn setup() -> anyhow::Result<TestingSetup> {
     let (factory_addr, cw20_addr) =
         setup_croncat_contracts(mock.app.as_ref().borrow_mut(), account.proxy.addr_str()?)?;
 
+    let factory_entry = UncheckedContractEntry::try_from(CRON_CAT_FACTORY.to_owned())?;
+    abstr_deployment.ans_host.execute(
+        &abstract_core::ans_host::ExecuteMsg::UpdateContractAddresses {
+            to_add: vec![(factory_entry, factory_addr.to_string())],
+            to_remove: vec![],
+        },
+        None,
+    )?;
+
     contract.deploy(CRONCAT_MODULE_VERSION.parse()?)?;
     account.install_module(
         CRONCAT_ID,
@@ -251,9 +265,7 @@ fn setup() -> anyhow::Result<TestingSetup> {
             base: BaseInstantiateMsg {
                 ans_host_address: abstr_deployment.ans_host.addr_str()?,
             },
-            module: AppInstantiateMsg {
-                factory_addr: factory_addr.into_string(),
-            },
+            module: AppInstantiateMsg {},
         },
         None,
     )?;
@@ -465,7 +477,7 @@ fn admin() -> anyhow::Result<()> {
     }
     .to_string();
 
-    let err = module_contract.update_config("new_addr".to_string());
+    let err = module_contract.update_config();
     assert_eq!(
         err.unwrap_err().root().to_string(),
         cw_controllers::AdminError::NotAdmin {}.to_string()
@@ -487,18 +499,17 @@ fn admin() -> anyhow::Result<()> {
 fn update_config() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
-        module_contract,
-        mock,
-        ..
+        module_contract, ..
     } = setup()?;
 
     let config_res: ConfigResponse = module_contract.config()?;
-    assert_ne!(config_res.config.factory_addr, mock.sender);
 
-    module_contract.update_config(mock.sender.to_string())?;
+    assert_eq!(config_res.config, Config {});
+
+    module_contract.update_config()?;
 
     let config_res: ConfigResponse = module_contract.config()?;
-    assert_eq!(config_res.config.factory_addr, mock.sender);
+    assert_eq!(config_res.config, Config {});
     Ok(())
 }
 
@@ -748,6 +759,7 @@ fn remove_task() -> anyhow::Result<()> {
         mock,
         account,
         cw20_addr,
+        abstr_deployment,
         ..
     } = setup()?;
 
@@ -823,7 +835,15 @@ fn remove_task() -> anyhow::Result<()> {
     // One of them will be removed by the agent
     let removed_task_hash = {
         mock.wait_blocks(3)?;
-        let factory_addr: Addr = module_contract.config()?.config.factory_addr;
+        let contracts_response: ContractsResponse =
+            abstr_deployment
+                .ans_host
+                .query(&abstract_core::ans_host::QueryMsg::Contracts {
+                    entries: vec![
+                        UncheckedContractEntry::try_from(CRON_CAT_FACTORY.to_owned())?.into(),
+                    ],
+                })?;
+        let factory_addr: Addr = contracts_response.contracts[0].1.clone();
         let response: ContractMetadataResponse = mock.query(
             &FactoryQueryMsg::LatestContract {
                 contract_name: MANAGER_NAME.to_string(),

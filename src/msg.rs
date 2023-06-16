@@ -17,18 +17,14 @@ impl app::AppQueryMsg for AppQueryMsg {}
 
 /// App instantiate message
 #[cosmwasm_schema::cw_serde]
-pub struct AppInstantiateMsg {
-    pub factory_addr: String,
-}
+pub struct AppInstantiateMsg {}
 
 /// App execute messages
 #[cosmwasm_schema::cw_serde]
 #[cfg_attr(feature = "interface", derive(cw_orch::ExecuteFns))]
 #[cfg_attr(feature = "interface", impl_into(ExecuteMsg))]
 pub enum AppExecuteMsg {
-    UpdateConfig {
-        factory_addr: String,
-    },
+    UpdateConfig {},
     CreateTask {
         task: Box<CronCatTaskRequest>,
         assets: AssetListUnchecked,

@@ -1,4 +1,4 @@
-use abstract_sdk::features::{AbstractResponse, AccountIdentification};
+use abstract_sdk::features::{AbstractNameService, AbstractResponse, AccountIdentification};
 use abstract_sdk::{AbstractSdkResult, AccountAction, Execution, ModuleInterface};
 use cosmwasm_std::{
     to_binary, wasm_execute, Addr, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
@@ -11,7 +11,9 @@ use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
 use cw20::Cw20ExecuteMsg;
 use cw_asset::AssetListUnchecked;
 
-use crate::contract::{check_users_balance_nonempty, sort_funds, CroncatApp, CroncatResult};
+use crate::contract::{
+    check_users_balance_nonempty, factory_addr, sort_funds, CroncatApp, CroncatResult,
+};
 
 use crate::msg::AppExecuteMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
@@ -37,9 +39,7 @@ pub fn execute_handler(
     msg: AppExecuteMsg,
 ) -> CroncatResult {
     match msg {
-        AppExecuteMsg::UpdateConfig { factory_addr } => {
-            update_config(deps, info, app, factory_addr)
-        }
+        AppExecuteMsg::UpdateConfig {} => update_config(deps, info, app),
         AppExecuteMsg::CreateTask { task, assets } => {
             create_task(deps.as_ref(), env, info, app, task, assets)
         }
@@ -51,18 +51,11 @@ pub fn execute_handler(
 }
 
 /// Update the configuration of the app
-fn update_config(
-    deps: DepsMut,
-    msg_info: MessageInfo,
-    app: CroncatApp,
-    new_factory_addr: String,
-) -> CroncatResult {
+fn update_config(deps: DepsMut, msg_info: MessageInfo, app: CroncatApp) -> CroncatResult {
     // Only the admin should be able to call this
     app.admin.assert_admin(deps.as_ref(), &msg_info.sender)?;
 
-    let factory_addr = deps.api.addr_validate(&new_factory_addr)?;
-
-    CONFIG.save(deps.storage, &Config { factory_addr })?;
+    CONFIG.save(deps.storage, &Config {})?;
     Ok(app.tag_response(Response::default(), "update_config"))
 }
 
@@ -81,17 +74,14 @@ fn create_task(
 
     let (funds, cw20s) = sort_funds(deps, assets)?;
 
-    let config = CONFIG.load(deps.storage)?;
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
     let executor = app.executor(deps);
 
     // Getting needed croncat addresses from factory
-    let tasks_addr = get_latest_croncat_contract(
-        &deps.querier,
-        config.factory_addr.clone(),
-        TASKS_NAME.to_owned(),
-    )?;
+    let tasks_addr =
+        get_latest_croncat_contract(&deps.querier, factory_addr.clone(), TASKS_NAME.to_owned())?;
     let manager_addr =
-        get_latest_croncat_contract(&deps.querier, config.factory_addr, MANAGER_NAME.to_owned())?;
+        get_latest_croncat_contract(&deps.querier, factory_addr, MANAGER_NAME.to_owned())?;
 
     // Making create task message that will be sended by the proxy
     let create_task_msg: CosmosMsg = wasm_execute(
@@ -144,18 +134,18 @@ fn remove_task(
         module_installed(deps.as_ref(), msg_info.sender, &app)?;
     }
 
-    let config = CONFIG.load(deps.storage)?;
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps.as_ref())?)?;
     let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
 
     let tasks_addr = get_croncat_contract(
         &deps.querier,
-        config.factory_addr.clone(),
+        factory_addr.clone(),
         TASKS_NAME.to_owned(),
         task_version.clone(),
     )?;
     let manager_addr = get_croncat_contract(
         &deps.querier,
-        config.factory_addr,
+        factory_addr,
         MANAGER_NAME.to_owned(),
         task_version,
     )?;
@@ -222,13 +212,13 @@ fn refill_task(
 
     let (funds, cw20s) = sort_funds(deps, assets)?;
 
-    let config = CONFIG.load(deps.storage)?;
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
     let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
     let executor = app.executor(deps);
 
     let manager_addr = get_croncat_contract(
         &deps.querier,
-        config.factory_addr,
+        factory_addr,
         MANAGER_NAME.to_owned(),
         task_version,
     )?;

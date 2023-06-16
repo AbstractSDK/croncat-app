@@ -13,4 +13,4 @@ pub use interface::App;
 #[cfg(feature = "interface")]
 pub use msg::{AppExecuteMsgFns, AppQueryMsgFns};
 
-pub use api::CronCat;
+pub use api::{CronCat, CRON_CAT_FACTORY};

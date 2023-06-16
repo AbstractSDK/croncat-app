@@ -1,5 +1,6 @@
 use crate::msg::AppMigrateMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
+use crate::CRON_CAT_FACTORY;
 use crate::{
     error::AppError,
     handlers,
@@ -36,7 +37,8 @@ const CRONCAT_APP: CroncatApp = CroncatApp::new(CRONCAT_ID, CRONCAT_MODULE_VERSI
 #[cfg(feature = "export")]
 abstract_app::export_endpoints!(CRONCAT_APP, CroncatApp);
 
-// Small helper
+// Small helpers
+// TODO: should be able to move those somewhere
 pub(crate) fn check_users_balance_nonempty(
     deps: cosmwasm_std::Deps,
     proxy_addr: cosmwasm_std::Addr,
@@ -76,4 +78,15 @@ pub(crate) fn sort_funds(
                 (funds, cw20s)
             });
     Ok((funds, cw20s))
+}
+
+pub(crate) fn factory_addr(
+    querier: &cosmwasm_std::QuerierWrapper,
+    ans_host: &abstract_sdk::feature_objects::AnsHost,
+) -> Result<cosmwasm_std::Addr, crate::error::AppError> {
+    let factory_entry =
+        abstract_core::objects::UncheckedContractEntry::try_from(CRON_CAT_FACTORY.to_owned())?
+            .into();
+    let factory_addr = ans_host.query_contract(querier, &factory_entry)?;
+    Ok(factory_addr)
 }
