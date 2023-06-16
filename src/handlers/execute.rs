@@ -1,7 +1,7 @@
 use abstract_sdk::features::{AbstractResponse, AccountIdentification};
-use abstract_sdk::{AccountAction, Execution};
+use abstract_sdk::{AbstractSdkResult, AccountAction, Execution, ModuleInterface};
 use cosmwasm_std::{
-    to_binary, wasm_execute, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
+    to_binary, wasm_execute, Addr, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
 };
 use croncat_integration_utils::task_creation::{get_croncat_contract, get_latest_croncat_contract};
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
@@ -16,6 +16,18 @@ use crate::contract::{check_users_balance_nonempty, sort_funds, CroncatApp, Cron
 use crate::msg::AppExecuteMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
 use crate::state::{Config, ACTIVE_TASKS, CONFIG, REMOVED_TASK_MANAGER_ADDR};
+
+// Check if module is installed on the account
+fn module_installed(deps: Deps, contract_addr: Addr, app: &CroncatApp) -> AbstractSdkResult<()> {
+    let contract_version = cw2::query_contract_info(&deps.querier, &contract_addr)?;
+    let modules = app.modules(deps);
+    let module_addr = modules.module_address(&contract_version.contract)?;
+    if module_addr != contract_addr {
+        Err(abstract_core::AbstractError::AppNotInstalled(contract_version.contract).into())
+    } else {
+        Ok(())
+    }
+}
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -63,7 +75,10 @@ fn create_task(
     task_request: Box<TaskRequest>,
     assets: AssetListUnchecked,
 ) -> CroncatResult {
-    app.admin.assert_admin(deps, &msg_info.sender)?;
+    if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
+        module_installed(deps, msg_info.sender, &app)?;
+    }
+
     let (funds, cw20s) = sort_funds(deps, assets)?;
 
     let config = CONFIG.load(deps.storage)?;
@@ -121,7 +136,13 @@ fn remove_task(
     app: CroncatApp,
     task_hash: String,
 ) -> CroncatResult {
-    app.admin.assert_admin(deps.as_ref(), &msg_info.sender)?;
+    if app
+        .admin
+        .assert_admin(deps.as_ref(), &msg_info.sender)
+        .is_err()
+    {
+        module_installed(deps.as_ref(), msg_info.sender, &app)?;
+    }
 
     let config = CONFIG.load(deps.storage)?;
     let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
@@ -195,7 +216,9 @@ fn refill_task(
     task_hash: String,
     assets: AssetListUnchecked,
 ) -> CroncatResult {
-    app.admin.assert_admin(deps, &msg_info.sender)?;
+    if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
+        module_installed(deps, msg_info.sender, &app)?;
+    }
 
     let (funds, cw20s) = sort_funds(deps, assets)?;
 

@@ -47,7 +47,9 @@ pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply
     })?;
 
     Ok(app.tag_response(
-        Response::new().add_attribute("task_hash", task_hash),
+        Response::new()
+            .set_data(task_hash.as_bytes())
+            .add_attribute("task_hash", task_hash),
         "create_task_reply",
     ))
 }

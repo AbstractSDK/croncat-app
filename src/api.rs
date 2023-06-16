@@ -2,23 +2,16 @@ use abstract_core::objects::module::ModuleId;
 use abstract_sdk::ModuleInterface;
 use abstract_sdk::{
     features::{AccountIdentification, Dependencies},
-    AbstractSdkError, AbstractSdkResult,
+    AbstractSdkResult,
 };
-use cosmwasm_std::{to_binary, wasm_execute, Coin, CosmosMsg, Deps};
-use croncat_integration_utils::{
-    task_creation::{get_croncat_contract, get_latest_croncat_contract},
-    MANAGER_NAME,
-};
-use croncat_integration_utils::{CronCatTaskRequest, TASKS_NAME};
-use croncat_sdk_manager::msg::ManagerExecuteMsg;
-use croncat_sdk_tasks::{
-    msg::{TasksExecuteMsg, TasksQueryMsg},
-    types::TaskResponse,
-};
-use cw20::Cw20ExecuteMsg;
+use cosmwasm_std::{wasm_execute, Addr, CosmosMsg, Deps};
+use croncat_integration_utils::CronCatTaskRequest;
+use croncat_sdk_manager::types::TaskBalanceResponse;
+use croncat_sdk_tasks::types::TaskResponse;
 use cw_asset::AssetListUnchecked;
 
-use crate::contract::{sort_funds, CRONCAT_ID};
+use crate::contract::CRONCAT_ID;
+use crate::msg::{AppExecuteMsg, AppQueryMsg};
 
 // Entry for the cron_cat factory address, stored in the ANS
 pub const CRON_CAT_FACTORY: &str = "croncat:factory";
@@ -46,29 +39,25 @@ pub struct CronCat<'a, T: CronCatInterface> {
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
-    /// Create task message
-    /// On success it will return [`croncat_integration_utils::CronCatTaskExecutionInfo`] in reply data
-    /// so you can save `task_hash` and `version` or any other useful information
+    /// Get address of this module
+    pub fn module_address(&self) -> AbstractSdkResult<Addr> {
+        self.base.modules(self.deps).module_address(self.module_id)
+    }
+    /// Create task
+    /// On success it will return task_hash in reply data, you can save it in dependent module.
+    /// This way you can track which tasks were created only by this module
     pub fn create_task(
         &self,
         task: CronCatTaskRequest,
-        funds: Vec<Coin>,
+        assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
-        let modules = self.base.modules(self.deps);
-
-        let croncat_factory_address = modules.module_address(CRON_CAT_FACTORY)?;
-        let tasks_addr = get_latest_croncat_contract(
-            &self.deps.querier,
-            croncat_factory_address,
-            TASKS_NAME.to_string(),
-        )
-        .map_err(|e| AbstractSdkError::generic_err(e.to_string()))?;
         Ok(wasm_execute(
-            tasks_addr,
-            &TasksExecuteMsg::CreateTask {
+            self.module_address()?,
+            &AppExecuteMsg::CreateTask {
                 task: Box::new(task),
+                assets,
             },
-            funds,
+            vec![],
         )?
         .into())
     }
@@ -77,78 +66,53 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     pub fn refill_task(
         &self,
         task_hash: String,
-        task_version: String,
         assets: AssetListUnchecked,
-    ) -> AbstractSdkResult<Vec<CosmosMsg>> {
-        let modules = self.base.modules(self.deps);
-        let querier = &self.deps.querier;
-        let (funds, cw20s) = sort_funds(self.deps, assets)?;
-        let mut messages = vec![];
+    ) -> AbstractSdkResult<CosmosMsg> {
+        Ok(wasm_execute(
+            self.module_address()?,
+            &AppExecuteMsg::RefillTask { task_hash, assets },
+            vec![],
+        )?
+        .into())
+    }
 
-        let croncat_factory_address = modules.module_address(self.module_id)?;
-        let manager_addr = get_croncat_contract(
-            querier,
-            croncat_factory_address,
-            MANAGER_NAME.to_string(),
-            task_version,
-        )
-        .map_err(|e| AbstractSdkError::generic_err(e.to_string()))?;
-
-        // Note: It will be up to one cw20 for now
-        // but maybe later we can support multiple if we could confirm some "recipe" won't lock agents gas limit
-        for cw20 in cw20s {
-            let cw20_transfer = wasm_execute(
-                cw20.address,
-                &Cw20ExecuteMsg::Send {
-                    contract: manager_addr.to_string(),
-                    amount: cw20.amount,
-                    msg: to_binary(
-                        &croncat_sdk_manager::msg::ManagerReceiveMsg::RefillTaskBalance {
-                            task_hash: task_hash.clone(),
-                        },
-                    )?,
-                },
-                vec![],
-            )?;
-            messages.push(cw20_transfer.into());
-        }
-        if !funds.is_empty() {
-            let refill_msg = wasm_execute(
-                manager_addr,
-                &ManagerExecuteMsg::RefillTaskBalance {
-                    task_hash: task_hash.clone(),
-                },
-                funds,
-            )?;
-            messages.push(refill_msg.into());
-        }
-        Ok(messages)
+    pub fn remove_task(&self, task_hash: String) -> AbstractSdkResult<CosmosMsg> {
+        Ok(wasm_execute(
+            self.module_address()?,
+            &AppExecuteMsg::RemoveTask { task_hash },
+            vec![],
+        )?
+        .into())
     }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
-    /// task_information
-    // TODO: should we provide here task's balance or make another method,
-    // NOTE: we would have to make another query
-    pub fn query_task_information(
-        &self,
-        task_hash: String,
-        task_version: String,
-    ) -> AbstractSdkResult<TaskResponse> {
-        let modules = self.base.modules(self.deps);
-        let querier = &self.deps.querier;
+    /// Task information
+    pub fn query_task_information(&self, task_hash: String) -> AbstractSdkResult<TaskResponse> {
+        Ok(self
+            .deps
+            .querier
+            .query_wasm_smart(self.module_address()?, &AppQueryMsg::TaskInfo { task_hash })?)
+    }
 
-        let croncat_factory_address = modules.module_address(self.module_id)?;
-        let tasks_addr = get_croncat_contract(
-            querier,
-            croncat_factory_address,
-            TASKS_NAME.to_string(),
-            task_version,
-        )
-        .map_err(|e| AbstractSdkError::generic_err(e.to_string()))?;
-        let task_response =
-            querier.query_wasm_smart(tasks_addr, &TasksQueryMsg::Task { task_hash })?;
-        Ok(task_response)
+    /// Task balance
+    pub fn query_task_balance(&self, task_hash: String) -> AbstractSdkResult<TaskBalanceResponse> {
+        Ok(self.deps.querier.query_wasm_smart(
+            self.module_address()?,
+            &AppQueryMsg::TaskBalance { task_hash },
+        )?)
+    }
+
+    /// Active tasks
+    pub fn query_active_tasks(
+        &self,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    ) -> AbstractSdkResult<Vec<String>> {
+        Ok(self.deps.querier.query_wasm_smart(
+            self.module_address()?,
+            &AppQueryMsg::ActiveTasks { start_after, limit },
+        )?)
     }
 }
 

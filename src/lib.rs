@@ -1,3 +1,4 @@
+mod api;
 pub mod contract;
 pub mod error;
 mod handlers;
@@ -6,7 +7,6 @@ pub mod interface;
 pub mod msg;
 mod replies;
 pub mod state;
-mod api;
 
 #[cfg(feature = "interface")]
 pub use interface::App;

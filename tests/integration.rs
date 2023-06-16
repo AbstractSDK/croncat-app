@@ -328,7 +328,7 @@ fn all_in_one() -> anyhow::Result<()> {
         AssetListUnchecked::from(assets)
     };
     module_contract.create_task(assets, Box::new(task)).unwrap();
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
 
     // Refilling task
@@ -422,7 +422,7 @@ fn all_in_one() -> anyhow::Result<()> {
     );
 
     // State updated
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 0);
 
     Ok(())
@@ -433,7 +433,8 @@ fn admin() -> anyhow::Result<()> {
     // Set up the environment and contract
     let TestingSetup {
         mut module_contract,
-        mock,
+        mock: _,
+        cw20_addr,
         ..
     } = setup()?;
 
@@ -455,12 +456,19 @@ fn admin() -> anyhow::Result<()> {
     };
 
     // Not admin sender
-    module_contract.set_sender(&mock.sender);
+    // Neither installed module
+    module_contract.set_sender(&cw20_addr);
 
-    let expected_err = cw_controllers::AdminError::NotAdmin {}.to_string();
+    let expected_err = abstract_sdk::AbstractSdkError::MissingModule {
+        module: "crates.io:cw20-base".to_owned(),
+    }
+    .to_string();
 
     let err = module_contract.update_config("new_addr".to_string());
-    assert_eq!(err.unwrap_err().root().to_string(), expected_err);
+    assert_eq!(
+        err.unwrap_err().root().to_string(),
+        cw_controllers::AdminError::NotAdmin {}.to_string()
+    );
 
     let err = module_contract.create_task(AssetListUnchecked::default(), Box::new(task));
     assert_eq!(err.unwrap_err().root().to_string(), expected_err);
@@ -524,7 +532,7 @@ fn create_task() -> anyhow::Result<()> {
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
 
     let task_info_response: TaskResponse = module_contract.task_info(active_tasks[0].clone())?;
@@ -571,7 +579,7 @@ fn create_task() -> anyhow::Result<()> {
 
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
     // This task creation we won't attach cw20s because we had some unused balance from the last creation
@@ -598,7 +606,7 @@ fn create_task() -> anyhow::Result<()> {
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 3);
 
     Ok(())
@@ -650,7 +658,7 @@ fn refill_task() -> anyhow::Result<()> {
     };
     module_contract.create_task(assets, Box::new(task))?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     let task_hash = active_tasks[0].clone();
 
     let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
@@ -846,7 +854,7 @@ fn remove_task() -> anyhow::Result<()> {
     };
 
     // Note: not updated
-    let mut active_tasks: Vec<String> = module_contract.active_tasks()?;
+    let mut active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
     active_tasks.retain(|task_hash| task_hash != &removed_task_hash);
