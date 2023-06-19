@@ -1,7 +1,8 @@
 use crate::{
-    contract::{check_users_balance_nonempty, CroncatApp, CroncatResult},
+    contract::{CroncatApp, CroncatResult},
     error::AppError,
     state::{ACTIVE_TASKS, REMOVED_TASK_MANAGER_ADDR},
+    utils::user_balance_nonempty,
 };
 
 use abstract_sdk::{
@@ -37,7 +38,7 @@ pub fn task_remove_reply(
     _reply: Reply,
 ) -> CroncatResult {
     let manager_addr = REMOVED_TASK_MANAGER_ADDR.load(deps.storage)?;
-    let response = if check_users_balance_nonempty(
+    let response = if user_balance_nonempty(
         deps.as_ref(),
         app.proxy_address(deps.as_ref())?,
         manager_addr.clone(),

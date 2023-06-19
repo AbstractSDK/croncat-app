@@ -1,6 +1,7 @@
-use crate::contract::{factory_addr, CroncatApp, CroncatResult};
+use crate::contract::{CroncatApp, CroncatResult};
 use crate::msg::{AppQueryMsg, ConfigResponse};
 use crate::state::{ACTIVE_TASKS, CONFIG};
+use crate::utils::factory_addr;
 use abstract_sdk::features::AbstractNameService;
 use cosmwasm_std::{to_binary, Binary, Deps, Env, StdResult};
 use croncat_integration_utils::task_creation::get_croncat_contract;

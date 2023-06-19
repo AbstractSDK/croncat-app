@@ -1,7 +1,7 @@
 use abstract_sdk::features::{AbstractNameService, AbstractResponse, AccountIdentification};
-use abstract_sdk::{AbstractSdkResult, AccountAction, Execution, ModuleInterface};
+use abstract_sdk::{prelude::*, AccountAction};
 use cosmwasm_std::{
-    to_binary, wasm_execute, Addr, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
+    to_binary, wasm_execute, CosmosMsg, Deps, DepsMut, Env, MessageInfo, ReplyOn, Response,
 };
 use croncat_integration_utils::task_creation::{get_croncat_contract, get_latest_croncat_contract};
 use croncat_integration_utils::{MANAGER_NAME, TASKS_NAME};
@@ -11,25 +11,14 @@ use croncat_sdk_tasks::types::{TaskRequest, TaskResponse};
 use cw20::Cw20ExecuteMsg;
 use cw_asset::AssetListUnchecked;
 
-use crate::contract::{
-    check_users_balance_nonempty, factory_addr, sort_funds, CroncatApp, CroncatResult,
+use crate::contract::{CroncatApp, CroncatResult};
+use crate::utils::{
+    assert_module_installed, user_balance_nonempty, factory_addr, sort_funds,
 };
 
 use crate::msg::AppExecuteMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
 use crate::state::{Config, ACTIVE_TASKS, CONFIG, REMOVED_TASK_MANAGER_ADDR};
-
-// Check if module is installed on the account
-fn module_installed(deps: Deps, contract_addr: Addr, app: &CroncatApp) -> AbstractSdkResult<()> {
-    let contract_version = cw2::query_contract_info(&deps.querier, &contract_addr)?;
-    let modules = app.modules(deps);
-    let module_addr = modules.module_address(&contract_version.contract)?;
-    if module_addr != contract_addr {
-        Err(abstract_core::AbstractError::AppNotInstalled(contract_version.contract).into())
-    } else {
-        Ok(())
-    }
-}
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -69,7 +58,7 @@ fn create_task(
     assets: AssetListUnchecked,
 ) -> CroncatResult {
     if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
-        module_installed(deps, msg_info.sender, &app)?;
+        assert_module_installed(deps, msg_info.sender, &app)?;
     }
 
     let (funds, cw20s) = sort_funds(deps, assets)?;
@@ -131,7 +120,7 @@ fn remove_task(
         .assert_admin(deps.as_ref(), &msg_info.sender)
         .is_err()
     {
-        module_installed(deps.as_ref(), msg_info.sender, &app)?;
+        assert_module_installed(deps.as_ref(), msg_info.sender, &app)?;
     }
 
     let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps.as_ref())?)?;
@@ -174,7 +163,7 @@ fn remove_task(
         )?;
         REMOVED_TASK_MANAGER_ADDR.save(deps.storage, &manager_addr)?;
         Response::new().add_submessage(executor_submessage)
-    } else if check_users_balance_nonempty(
+    } else if user_balance_nonempty(
         deps.as_ref(),
         app.proxy_address(deps.as_ref())?,
         manager_addr.clone(),
@@ -207,7 +196,7 @@ fn refill_task(
     assets: AssetListUnchecked,
 ) -> CroncatResult {
     if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
-        module_installed(deps, msg_info.sender, &app)?;
+        assert_module_installed(deps, msg_info.sender, &app)?;
     }
 
     let (funds, cw20s) = sort_funds(deps, assets)?;
