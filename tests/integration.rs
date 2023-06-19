@@ -343,7 +343,7 @@ fn all_in_one() -> anyhow::Result<()> {
     };
     let task_tag = "test_sends".to_owned();
     module_contract
-        .create_task(assets, Box::new(task), task_tag.clone())
+        .create_task(assets, Box::new(task), task_tag)
         .unwrap();
     let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
@@ -680,7 +680,7 @@ fn refill_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task), task_tag.clone())?;
+    module_contract.create_task(assets, Box::new(task), task_tag)?;
 
     let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     let (creator_addr, task_tag) = active_tasks[0].clone();
@@ -751,7 +751,7 @@ fn refill_task() -> anyhow::Result<()> {
     };
     module_contract.refill_task(assets, task_tag.clone())?;
     let task_balance: TaskBalanceResponse =
-        module_contract.task_balance(creator_addr.to_string(), task_tag.clone())?;
+        module_contract.task_balance(creator_addr.to_string(), task_tag)?;
     assert_eq!(
         task_balance.balance.unwrap(),
         TaskBalance {
@@ -813,7 +813,7 @@ fn remove_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task), task_tag1.clone())?;
+    module_contract.create_task(assets, Box::new(task), task_tag1)?;
 
     let cw20_amount = Cw20Coin {
         address: cw20_addr.to_string(),

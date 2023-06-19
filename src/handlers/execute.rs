@@ -150,7 +150,7 @@ fn remove_task(
         task_version,
     )?;
 
-    ACTIVE_TASKS.remove(deps.storage, key.clone());
+    ACTIVE_TASKS.remove(deps.storage, key);
     let task_response: TaskResponse = deps.querier.query_wasm_smart(
         tasks_addr.to_string(),
         &TasksQueryMsg::Task {
@@ -211,7 +211,7 @@ fn refill_task(
     }
 
     let key = (msg_info.sender, task_tag);
-    let (task_hash, task_version) = ACTIVE_TASKS.load(deps.storage, key.clone())?;
+    let (task_hash, task_version) = ACTIVE_TASKS.load(deps.storage, key)?;
 
     let (funds, cw20s) = sort_funds(deps.api, assets)?;
 

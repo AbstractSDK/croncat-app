@@ -45,9 +45,15 @@ pub enum AppQueryMsg {
         limit: Option<u32>,
     },
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
-    TaskInfo { creator_addr: String, task_tag: String },
+    TaskInfo {
+        creator_addr: String,
+        task_tag: String,
+    },
     #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]
-    TaskBalance { creator_addr: String, task_tag: String},
+    TaskBalance {
+        creator_addr: String,
+        task_tag: String,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]
