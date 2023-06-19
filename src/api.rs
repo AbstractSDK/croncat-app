@@ -133,6 +133,23 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
             },
         )
     }
+
+    /// Active tasks by creator
+    pub fn query_active_tasks_by_creator(
+        &self,
+        creator_addr: String,
+        start_after: Option<impl Into<String>>,
+        limit: Option<u32>,
+    ) -> AbstractSdkResult<Vec<String>> {
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::ActiveTasksByCreator {
+                creator_addr,
+                start_after: start_after.map(Into::into),
+                limit,
+            },
+        )
+    }
 }
 
 #[cfg(test)]
