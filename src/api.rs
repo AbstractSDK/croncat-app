@@ -124,7 +124,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         &self,
         start_after: Option<(impl Into<String>, impl Into<String>)>,
         limit: Option<u32>,
-    ) -> AbstractSdkResult<Vec<String>> {
+    ) -> AbstractSdkResult<Vec<(Addr, String)>> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::ActiveTasks {

@@ -1,4 +1,5 @@
 use cosmwasm_schema::QueryResponses;
+use cosmwasm_std::Addr;
 use croncat_integration_utils::CronCatTaskRequest;
 use cw_asset::AssetListUnchecked;
 
@@ -38,7 +39,7 @@ pub enum AppExecuteMsg {
 pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
-    #[returns(Vec<String>)]
+    #[returns(Vec<(Addr, String)>)]
     ActiveTasks {
         start_after: Option<(String, String)>,
         limit: Option<u32>,
