@@ -895,7 +895,7 @@ fn remove_task() -> anyhow::Result<()> {
         active_tasks_checked.pop().unwrap().1,
         active_tasks.pop().unwrap().1,
     );
-    
+
     let proxy_cw20_balance1: cw20::BalanceResponse = mock.query(
         &Cw20QueryMsg::Balance {
             address: account.proxy.addr_str()?,

@@ -25,11 +25,10 @@ fn check_if_task_exists(
             Ok(addr) => addr,
             Err(_) => return false,
         };
-    match croncat_manager::state::TASKS_BALANCES.query(querier, manager_addr, task_hash.as_bytes())
-    {
-        Ok(Some(_)) => true,
-        _ => false,
-    }
+    matches!(
+        croncat_manager::state::TASKS_BALANCES.query(querier, manager_addr, task_hash.as_bytes()),
+        Ok(Some(_))
+    )
 }
 
 pub fn query_handler(
