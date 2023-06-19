@@ -1,6 +1,6 @@
 use abstract_core::objects::UncheckedContractEntry;
 use abstract_sdk::{feature_objects::AnsHost, prelude::*, AbstractSdkResult};
-use cosmwasm_std::{coin, Addr, Coin, Deps, QuerierWrapper};
+use cosmwasm_std::{coin, Addr, Coin, Deps, QuerierWrapper, Api};
 use croncat_sdk_manager::msg::ManagerQueryMsg;
 use cw20::Cw20CoinVerified;
 use cw_asset::{AssetError, AssetInfoBase, AssetListUnchecked};
@@ -10,10 +10,10 @@ use crate::{contract::CroncatApp, error::AppError, CRON_CAT_FACTORY};
 // Check if module is installed on the account
 pub(crate) fn assert_module_installed(
     deps: Deps,
-    contract_addr: Addr,
+    contract_addr: &Addr,
     app: &CroncatApp,
 ) -> AbstractSdkResult<()> {
-    let contract_version = cw2::query_contract_info(&deps.querier, &contract_addr)?;
+    let contract_version = cw2::query_contract_info(&deps.querier, contract_addr)?;
     let modules = app.modules(deps);
     let module_addr = modules.module_address(&contract_version.contract)?;
     if module_addr != contract_addr {
@@ -43,10 +43,10 @@ pub(crate) fn user_balance_nonempty(
 
 // Sort assetlist to coins and cw20s
 pub(crate) fn sort_funds(
-    deps: Deps,
+    api: &dyn Api,
     assets: AssetListUnchecked,
 ) -> Result<(Vec<Coin>, Vec<Cw20CoinVerified>), AssetError> {
-    let assets = assets.check(deps.api, None)?;
+    let assets = assets.check(api, None)?;
     let (funds, cw20s) =
         assets
             .into_iter()

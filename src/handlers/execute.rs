@@ -12,13 +12,12 @@ use cw20::Cw20ExecuteMsg;
 use cw_asset::AssetListUnchecked;
 
 use crate::contract::{CroncatApp, CroncatResult};
-use crate::utils::{
-    assert_module_installed, user_balance_nonempty, factory_addr, sort_funds,
-};
+use crate::error::AppError;
+use crate::utils::{assert_module_installed, factory_addr, sort_funds, user_balance_nonempty};
 
 use crate::msg::AppExecuteMsg;
 use crate::replies::{TASK_CREATE_REPLY_ID, TASK_REMOVE_REPLY_ID};
-use crate::state::{Config, ACTIVE_TASKS, CONFIG, REMOVED_TASK_MANAGER_ADDR};
+use crate::state::{Config, ACTIVE_TASKS, CONFIG, REMOVED_TASK_MANAGER_ADDR, TEMP_TASK_KEY};
 
 pub fn execute_handler(
     deps: DepsMut,
@@ -29,12 +28,14 @@ pub fn execute_handler(
 ) -> CroncatResult {
     match msg {
         AppExecuteMsg::UpdateConfig {} => update_config(deps, info, app),
-        AppExecuteMsg::CreateTask { task, assets } => {
-            create_task(deps.as_ref(), env, info, app, task, assets)
-        }
-        AppExecuteMsg::RemoveTask { task_hash } => remove_task(deps, env, info, app, task_hash),
-        AppExecuteMsg::RefillTask { task_hash, assets } => {
-            refill_task(deps.as_ref(), env, info, app, task_hash, assets)
+        AppExecuteMsg::CreateTask {
+            task,
+            task_tag,
+            assets,
+        } => create_task(deps, env, info, app, task, task_tag, assets),
+        AppExecuteMsg::RemoveTask { task_tag } => remove_task(deps, env, info, app, task_tag),
+        AppExecuteMsg::RefillTask { task_tag, assets } => {
+            refill_task(deps.as_ref(), env, info, app, task_tag, assets)
         }
     }
 }
@@ -50,21 +51,30 @@ fn update_config(deps: DepsMut, msg_info: MessageInfo, app: CroncatApp) -> Cronc
 
 /// Create a task
 fn create_task(
-    deps: Deps,
+    deps: DepsMut,
     _env: Env,
     msg_info: MessageInfo,
     app: CroncatApp,
     task_request: Box<TaskRequest>,
+    task_tag: String,
     assets: AssetListUnchecked,
 ) -> CroncatResult {
-    if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
-        assert_module_installed(deps, msg_info.sender, &app)?;
+    if app
+        .admin
+        .assert_admin(deps.as_ref(), &msg_info.sender)
+        .is_err()
+    {
+        assert_module_installed(deps.as_ref(), &msg_info.sender, &app)?;
+    }
+    let key = (msg_info.sender, task_tag);
+    if ACTIVE_TASKS.has(deps.storage, key.clone()) {
+        return Err(AppError::TaskAlreadyExists { task_tag: key.1 });
     }
 
-    let (funds, cw20s) = sort_funds(deps, assets)?;
+    let (funds, cw20s) = sort_funds(deps.api, assets)?;
 
-    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
-    let executor = app.executor(deps);
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps.as_ref())?)?;
+    let executor = app.executor(deps.as_ref());
 
     // Getting needed croncat addresses from factory
     let tasks_addr =
@@ -101,6 +111,7 @@ fn create_task(
         messages.push(executor.execute(vec![cw20_transfer.into()])?);
     }
 
+    TEMP_TASK_KEY.save(deps.storage, &key)?;
     let response = Response::default()
         .add_messages(messages)
         .add_submessage(create_task_submessage);
@@ -113,19 +124,19 @@ fn remove_task(
     _env: Env,
     msg_info: MessageInfo,
     app: CroncatApp,
-    task_hash: String,
+    task_tag: String,
 ) -> CroncatResult {
     if app
         .admin
         .assert_admin(deps.as_ref(), &msg_info.sender)
         .is_err()
     {
-        assert_module_installed(deps.as_ref(), msg_info.sender, &app)?;
+        assert_module_installed(deps.as_ref(), &msg_info.sender, &app)?;
     }
+    let key = (msg_info.sender, task_tag);
+    let (task_hash, task_version) = ACTIVE_TASKS.load(deps.storage, key.clone())?;
 
     let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps.as_ref())?)?;
-    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
-
     let tasks_addr = get_croncat_contract(
         &deps.querier,
         factory_addr.clone(),
@@ -139,7 +150,7 @@ fn remove_task(
         task_version,
     )?;
 
-    ACTIVE_TASKS.remove(deps.storage, &task_hash);
+    ACTIVE_TASKS.remove(deps.storage, key.clone());
     let task_response: TaskResponse = deps.querier.query_wasm_smart(
         tasks_addr.to_string(),
         &TasksQueryMsg::Task {
@@ -192,19 +203,21 @@ fn refill_task(
     _env: Env,
     msg_info: MessageInfo,
     app: CroncatApp,
-    task_hash: String,
+    task_tag: String,
     assets: AssetListUnchecked,
 ) -> CroncatResult {
     if app.admin.assert_admin(deps, &msg_info.sender).is_err() {
-        assert_module_installed(deps, msg_info.sender, &app)?;
+        assert_module_installed(deps, &msg_info.sender, &app)?;
     }
 
-    let (funds, cw20s) = sort_funds(deps, assets)?;
+    let key = (msg_info.sender, task_tag);
+    let (task_hash, task_version) = ACTIVE_TASKS.load(deps.storage, key.clone())?;
 
-    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
-    let task_version = ACTIVE_TASKS.load(deps.storage, &task_hash)?;
+    let (funds, cw20s) = sort_funds(deps.api, assets)?;
+
     let executor = app.executor(deps);
 
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
     let manager_addr = get_croncat_contract(
         &deps.querier,
         factory_addr,
