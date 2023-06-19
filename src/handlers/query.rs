@@ -23,6 +23,16 @@ pub fn query_handler(
         AppQueryMsg::ActiveTasks { start_after, limit } => {
             to_binary(&query_active_tasks(deps, start_after, limit)?)
         }
+        AppQueryMsg::ActiveTasksByCreator {
+            creator_addr,
+            start_after,
+            limit,
+        } => to_binary(&query_active_tasks_by_creator(
+            deps,
+            creator_addr,
+            start_after,
+            limit,
+        )?),
         AppQueryMsg::TaskInfo {
             creator_addr,
             task_tag,
@@ -50,6 +60,25 @@ fn query_active_tasks(
         None => None,
     };
     let keys = ACTIVE_TASKS.keys(
+        deps.storage,
+        start_after.map(Bound::exclusive),
+        None,
+        cosmwasm_std::Order::Ascending,
+    );
+    match limit {
+        Some(limit) => keys.take(limit as usize).collect(),
+        None => keys.collect(),
+    }
+}
+
+fn query_active_tasks_by_creator(
+    deps: Deps,
+    creator: String,
+    start_after: Option<String>,
+    limit: Option<u32>,
+) -> StdResult<Vec<String>> {
+    let addr = deps.api.addr_validate(&creator)?;
+    let keys = ACTIVE_TASKS.prefix(addr).keys(
         deps.storage,
         start_after.map(Bound::exclusive),
         None,

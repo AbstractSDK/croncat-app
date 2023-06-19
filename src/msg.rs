@@ -44,6 +44,12 @@ pub enum AppQueryMsg {
         start_after: Option<(String, String)>,
         limit: Option<u32>,
     },
+    #[returns(Vec<String>)]
+    ActiveTasksByCreator {
+        creator_addr: String,
+        start_after: Option<String>,
+        limit: Option<u32>,
+    },
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
     TaskInfo {
         creator_addr: String,

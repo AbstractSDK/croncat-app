@@ -347,7 +347,9 @@ fn all_in_one() -> anyhow::Result<()> {
         .unwrap();
     let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
-
+    let active_tasks_by_creator: Vec<String> =
+        module_contract.active_tasks_by_creator(account.manager.addr_str()?, None, None)?;
+    assert_eq!(active_tasks_by_creator.len(), 1);
     // Refilling task
     let task_balance1: TaskBalance = module_contract
         .task_balance(active_tasks[0].0.to_string(), active_tasks[0].1.clone())?
