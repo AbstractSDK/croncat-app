@@ -11,6 +11,7 @@ use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
 use app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
+    error::AppError,
     msg::{AppInstantiateMsg, ConfigResponse, InstantiateMsg},
     state::Config,
     AppExecuteMsgFns, AppQueryMsgFns, CroncatApp, CRON_CAT_FACTORY,
@@ -340,13 +341,18 @@ fn all_in_one() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task)).unwrap();
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let task_tag = "test_sends".to_owned();
+    module_contract
+        .create_task(assets, Box::new(task), task_tag)
+        .unwrap();
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
-
+    let active_tasks_by_creator: Vec<String> =
+        module_contract.active_tasks_by_creator(account.manager.addr_str()?, None, None)?;
+    assert_eq!(active_tasks_by_creator.len(), 1);
     // Refilling task
     let task_balance1: TaskBalance = module_contract
-        .task_balance(active_tasks[0].clone())?
+        .task_balance(active_tasks[0].0.to_string(), active_tasks[0].1.clone())?
         .balance
         .unwrap();
     let assets = {
@@ -358,10 +364,10 @@ fn all_in_one() -> anyhow::Result<()> {
         AssetListUnchecked::from(assets)
     };
     module_contract
-        .refill_task(assets, active_tasks[0].clone())
+        .refill_task(assets, active_tasks[0].1.clone())
         .unwrap();
     let task_balance2: TaskBalance = module_contract
-        .task_balance(active_tasks[0].clone())?
+        .task_balance(active_tasks[0].0.to_string(), active_tasks[0].1.clone())?
         .balance
         .unwrap();
     assert_eq!(
@@ -406,7 +412,7 @@ fn all_in_one() -> anyhow::Result<()> {
     )?;
     assert!(manager_cw20_balance.balance.is_zero());
 
-    module_contract.remove_task(active_tasks[0].clone())?;
+    module_contract.remove_task(active_tasks[0].1.clone())?;
 
     // After task is removed check all balances got not here
     let module_balance = mock.query_balance(&module_contract.address()?, DENOM)?;
@@ -435,7 +441,7 @@ fn all_in_one() -> anyhow::Result<()> {
     );
 
     // State updated
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 0);
 
     Ok(())
@@ -482,8 +488,8 @@ fn admin() -> anyhow::Result<()> {
         err.unwrap_err().root().to_string(),
         cw_controllers::AdminError::NotAdmin {}.to_string()
     );
-
-    let err = module_contract.create_task(AssetListUnchecked::default(), Box::new(task));
+    let task_tag = "test_tag".to_owned();
+    let err = module_contract.create_task(AssetListUnchecked::default(), Box::new(task), task_tag);
     assert_eq!(err.unwrap_err().root().to_string(), expected_err);
 
     let err = module_contract.remove_task("aloha:321".to_owned());
@@ -541,13 +547,15 @@ fn create_task() -> anyhow::Result<()> {
         transforms: None,
         cw20: None,
     };
+    let task_tag = "test_tag".to_owned();
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
-    module_contract.create_task(assets, Box::new(task))?;
+    module_contract.create_task(assets, Box::new(task), task_tag.clone())?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 1);
 
-    let task_info_response: TaskResponse = module_contract.task_info(active_tasks[0].clone())?;
+    let task_info_response: TaskResponse =
+        module_contract.task_info(active_tasks[0].0.to_string(), active_tasks[0].1.to_string())?;
     assert_eq!(
         task_info_response.task.unwrap().owner_addr,
         account.proxy.addr_str()?
@@ -588,10 +596,15 @@ fn create_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
+    let err = module_contract.create_task(assets.clone(), Box::new(task.clone()), task_tag.clone());
+    assert_eq!(
+        err.unwrap_err().root().to_string(),
+        AppError::TaskAlreadyExists { task_tag }.to_string()
+    );
+    let task_tag = "test_tag2".to_owned();
+    module_contract.create_task(assets, Box::new(task), task_tag)?;
 
-    module_contract.create_task(assets, Box::new(task))?;
-
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
     // This task creation we won't attach cw20s because we had some unused balance from the last creation
@@ -615,10 +628,11 @@ fn create_task() -> anyhow::Result<()> {
         transforms: None,
         cw20: Some(cw20_amount),
     };
+    let task_tag = "test_tag3".to_owned();
     let assets = AssetListUnchecked::from(AssetList::from(coins(45_000, DENOM)));
-    module_contract.create_task(assets, Box::new(task))?;
+    module_contract.create_task(assets, Box::new(task), task_tag)?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 3);
 
     Ok(())
@@ -659,7 +673,7 @@ fn refill_task() -> anyhow::Result<()> {
         transforms: None,
         cw20: Some(cw20_amount),
     };
-
+    let task_tag = "test_tag".to_owned();
     let assets = {
         let mut assets = AssetList::from(coins(40_000, DENOM));
         assets.add(&Asset::cw20(
@@ -668,12 +682,13 @@ fn refill_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task))?;
+    module_contract.create_task(assets, Box::new(task), task_tag)?;
 
-    let active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
-    let task_hash = active_tasks[0].clone();
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
+    let (creator_addr, task_tag) = active_tasks[0].clone();
 
-    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    let task_balance: TaskBalanceResponse =
+        module_contract.task_balance(creator_addr.to_string(), task_tag.clone())?;
     assert_eq!(
         task_balance.balance.unwrap(),
         TaskBalance {
@@ -688,8 +703,9 @@ fn refill_task() -> anyhow::Result<()> {
 
     // Refill only with native coins
     let assets = AssetListUnchecked::from(AssetList::from(coins(123, DENOM)));
-    module_contract.refill_task(assets, task_hash.clone())?;
-    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    module_contract.refill_task(assets, task_tag.clone())?;
+    let task_balance: TaskBalanceResponse =
+        module_contract.task_balance(creator_addr.to_string(), task_tag.clone())?;
     assert_eq!(
         task_balance.balance.unwrap(),
         TaskBalance {
@@ -711,8 +727,9 @@ fn refill_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.refill_task(assets, task_hash.clone())?;
-    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash.clone())?;
+    module_contract.refill_task(assets, task_tag.clone())?;
+    let task_balance: TaskBalanceResponse =
+        module_contract.task_balance(creator_addr.to_string(), task_tag.clone())?;
     assert_eq!(
         task_balance.balance.unwrap(),
         TaskBalance {
@@ -734,8 +751,9 @@ fn refill_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.refill_task(assets, task_hash.clone())?;
-    let task_balance: TaskBalanceResponse = module_contract.task_balance(task_hash)?;
+    module_contract.refill_task(assets, task_tag.clone())?;
+    let task_balance: TaskBalanceResponse =
+        module_contract.task_balance(creator_addr.to_string(), task_tag)?;
     assert_eq!(
         task_balance.balance.unwrap(),
         TaskBalance {
@@ -788,6 +806,7 @@ fn remove_task() -> anyhow::Result<()> {
         transforms: None,
         cw20: Some(cw20_amount),
     };
+    let task_tag1 = "test_tag1".to_owned();
     let assets = {
         let mut assets = AssetList::from(coins(40_000, DENOM));
         assets.add(&Asset::cw20(
@@ -796,7 +815,7 @@ fn remove_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task))?;
+    module_contract.create_task(assets, Box::new(task), task_tag1)?;
 
     let cw20_amount = Cw20Coin {
         address: cw20_addr.to_string(),
@@ -822,6 +841,7 @@ fn remove_task() -> anyhow::Result<()> {
         transforms: None,
         cw20: Some(cw20_amount),
     };
+    let task_tag2 = "test_tag2".to_owned();
     let assets = {
         let mut assets = AssetList::from(coins(40_000, DENOM));
         assets.add(&Asset::cw20(
@@ -830,10 +850,10 @@ fn remove_task() -> anyhow::Result<()> {
         ))?;
         AssetListUnchecked::from(assets)
     };
-    module_contract.create_task(assets, Box::new(task))?;
+    module_contract.create_task(assets, Box::new(task), task_tag2)?;
 
     // One of them will be removed by the agent
-    let removed_task_hash = {
+    {
         mock.wait_blocks(3)?;
         let contracts_response: ContractsResponse =
             abstr_deployment
@@ -851,36 +871,31 @@ fn remove_task() -> anyhow::Result<()> {
             &factory_addr,
         )?;
         let manager_addr: Addr = response.metadata.unwrap().contract_addr;
-        let resp = mock.app.borrow_mut().execute_contract(
+        mock.app.borrow_mut().execute_contract(
             Addr::unchecked(AGENT),
             manager_addr,
             &ManagerExecuteMsg::ProxyCall { task_hash: None },
             &[],
         )?;
-        let event = resp
-            .events
-            .into_iter()
-            .find(|ev| {
-                ev.attributes
-                    .iter()
-                    .any(|attr| attr.key == "lifecycle" && attr.value == "task_ended")
-            })
-            .unwrap();
-        let attr = event
-            .attributes
-            .into_iter()
-            .find(|attr| attr.key == "task_hash")
-            .unwrap();
-        attr.value
     };
 
     // Note: not updated
-    let mut active_tasks: Vec<String> = module_contract.active_tasks(None, None)?;
+    let active_tasks: Vec<(Addr, String)> = module_contract.active_tasks(None, None)?;
     assert_eq!(active_tasks.len(), 2);
 
-    active_tasks.retain(|task_hash| task_hash != &removed_task_hash);
-    let not_removed_task_hash = active_tasks.pop().unwrap();
-
+    // Note: tasks sorted by task_hash so we have no idea which one will get executed if they scheduled on a same block, LOL
+    let (active_task, not_active_task) = match (
+        module_contract.task_info(active_tasks[0].0.to_string(), active_tasks[0].1.clone())?,
+        module_contract.task_info(active_tasks[1].0.to_string(), active_tasks[1].1.clone())?,
+    ) {
+        (TaskResponse { task: Some(_) }, _) => {
+            (active_tasks[0].1.clone(), active_tasks[1].1.clone())
+        }
+        (_, TaskResponse { task: Some(_) }) => {
+            (active_tasks[1].1.clone(), active_tasks[0].1.clone())
+        }
+        _ => unreachable!(),
+    };
     let proxy_cw20_balance1: cw20::BalanceResponse = mock.query(
         &Cw20QueryMsg::Balance {
             address: account.proxy.addr_str()?,
@@ -888,7 +903,7 @@ fn remove_task() -> anyhow::Result<()> {
         &cw20_addr,
     )?;
 
-    module_contract.remove_task(removed_task_hash)?;
+    module_contract.remove_task(not_active_task)?;
 
     let proxy_cw20_balance2: cw20::BalanceResponse = mock.query(
         &Cw20QueryMsg::Balance {
@@ -899,7 +914,7 @@ fn remove_task() -> anyhow::Result<()> {
 
     assert!(proxy_cw20_balance2.balance > proxy_cw20_balance1.balance);
 
-    module_contract.remove_task(not_removed_task_hash)?;
+    module_contract.remove_task(active_task)?;
 
     let proxy_cw20_balance3: cw20::BalanceResponse = mock.query(
         &Cw20QueryMsg::Balance {

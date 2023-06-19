@@ -1,4 +1,5 @@
 use cosmwasm_schema::QueryResponses;
+use cosmwasm_std::Addr;
 use croncat_integration_utils::CronCatTaskRequest;
 use cw_asset::AssetListUnchecked;
 
@@ -19,13 +20,14 @@ pub enum AppExecuteMsg {
     UpdateConfig {},
     CreateTask {
         task: Box<CronCatTaskRequest>,
+        task_tag: String,
         assets: AssetListUnchecked,
     },
     RemoveTask {
-        task_hash: String,
+        task_tag: String,
     },
     RefillTask {
-        task_hash: String,
+        task_tag: String,
         assets: AssetListUnchecked,
     },
 }
@@ -37,15 +39,27 @@ pub enum AppExecuteMsg {
 pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
-    #[returns(Vec<String>)]
+    #[returns(Vec<(Addr, String)>)]
     ActiveTasks {
+        start_after: Option<(String, String)>,
+        limit: Option<u32>,
+    },
+    #[returns(Vec<String>)]
+    ActiveTasksByCreator {
+        creator_addr: String,
         start_after: Option<String>,
         limit: Option<u32>,
     },
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
-    TaskInfo { task_hash: String },
+    TaskInfo {
+        creator_addr: String,
+        task_tag: String,
+    },
     #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]
-    TaskBalance { task_hash: String },
+    TaskBalance {
+        creator_addr: String,
+        task_tag: String,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]

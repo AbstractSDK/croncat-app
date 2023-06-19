@@ -50,12 +50,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     pub fn create_task(
         &self,
         task: CronCatTaskRequest,
+        task_tag: String,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
         self.base.apps(self.deps).request(
             self.module_id,
             AppExecuteMsg::CreateTask {
                 task: Box::new(task),
+                task_tag,
                 assets,
             },
         )
@@ -64,23 +66,23 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Refill a task's balance messages
     pub fn refill_task(
         &self,
-        task_hash: impl Into<String>,
+        task_tag: impl Into<String>,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
         self.base.apps(self.deps).request(
             self.module_id,
             AppExecuteMsg::RefillTask {
-                task_hash: task_hash.into(),
+                task_tag: task_tag.into(),
                 assets,
             },
         )
     }
 
-    pub fn remove_task(&self, task_hash: impl Into<String>) -> AbstractSdkResult<CosmosMsg> {
+    pub fn remove_task(&self, task_tag: impl Into<String>) -> AbstractSdkResult<CosmosMsg> {
         self.base.apps(self.deps).request(
             self.module_id,
             AppExecuteMsg::RemoveTask {
-                task_hash: task_hash.into(),
+                task_tag: task_tag.into(),
             },
         )
     }
@@ -90,12 +92,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Task information
     pub fn query_task_information(
         &self,
-        task_hash: impl Into<String>,
+        creator_addr: impl Into<String>,
+        task_tag: impl Into<String>,
     ) -> AbstractSdkResult<TaskResponse> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::TaskInfo {
-                task_hash: task_hash.into(),
+                creator_addr: creator_addr.into(),
+                task_tag: task_tag.into(),
             },
         )
     }
@@ -103,12 +107,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Task balance
     pub fn query_task_balance(
         &self,
-        task_hash: impl Into<String>,
+        creator_addr: impl Into<String>,
+        task_tag: impl Into<String>,
     ) -> AbstractSdkResult<TaskBalanceResponse> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::TaskBalance {
-                task_hash: task_hash.into(),
+                creator_addr: creator_addr.into(),
+                task_tag: task_tag.into(),
             },
         )
     }
@@ -116,12 +122,29 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Active tasks
     pub fn query_active_tasks(
         &self,
+        start_after: Option<(impl Into<String>, impl Into<String>)>,
+        limit: Option<u32>,
+    ) -> AbstractSdkResult<Vec<(Addr, String)>> {
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::ActiveTasks {
+                start_after: start_after.map(|(addr, tag)| (addr.into(), tag.into())),
+                limit,
+            },
+        )
+    }
+
+    /// Active tasks by creator
+    pub fn query_active_tasks_by_creator(
+        &self,
+        creator_addr: String,
         start_after: Option<impl Into<String>>,
         limit: Option<u32>,
     ) -> AbstractSdkResult<Vec<String>> {
         self.base.apps(self.deps).query(
             self.module_id,
-            AppQueryMsg::ActiveTasks {
+            AppQueryMsg::ActiveTasksByCreator {
+                creator_addr,
                 start_after: start_after.map(Into::into),
                 limit,
             },
@@ -167,12 +190,14 @@ mod test {
             cw20: None,
         };
         let assets: AssetListUnchecked = AssetList::from(coins(10, "juno")).into();
+        let task_tag = "bobaforbob".to_owned();
         let expected = ExecuteMsg::from(AppExecuteMsg::CreateTask {
             task: Box::new(task.clone()),
+            task_tag: task_tag.clone(),
             assets: assets.clone(),
         });
 
-        let actual = cron_cat.create_task(task, assets);
+        let actual = cron_cat.create_task(task, task_tag, assets);
 
         assert_that!(actual).is_ok();
 
@@ -198,15 +223,15 @@ mod test {
         let mut cron_cat = stub.cron_cat(deps.as_ref());
         cron_cat.module_id = TEST_MODULE_ID;
 
-        let task_hash = TEST_TASK_HASH;
+        let task_tag = TEST_TASK_HASH;
 
         let assets: AssetListUnchecked = AssetList::from(coins(10, "juno")).into();
         let expected = ExecuteMsg::from(AppExecuteMsg::RefillTask {
-            task_hash: task_hash.to_owned(),
+            task_tag: task_tag.to_owned(),
             assets: assets.clone(),
         });
 
-        let actual = cron_cat.refill_task(task_hash, assets);
+        let actual = cron_cat.refill_task(task_tag, assets);
 
         assert_that!(actual).is_ok();
 
@@ -232,13 +257,13 @@ mod test {
         let mut cron_cat = stub.cron_cat(deps.as_ref());
         cron_cat.module_id = TEST_MODULE_ID;
 
-        let task_hash = TEST_TASK_HASH;
+        let task_tag = TEST_TASK_HASH;
 
         let expected = ExecuteMsg::from(AppExecuteMsg::RemoveTask {
-            task_hash: task_hash.to_owned(),
+            task_tag: task_tag.to_owned(),
         });
 
-        let actual = cron_cat.remove_task(task_hash);
+        let actual = cron_cat.remove_task(task_tag);
 
         assert_that!(actual).is_ok();
 

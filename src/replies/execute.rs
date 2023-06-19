@@ -1,7 +1,7 @@
 use crate::{
-    contract::{check_users_balance_nonempty, CroncatApp, CroncatResult},
-    error::AppError,
-    state::{ACTIVE_TASKS, REMOVED_TASK_MANAGER_ADDR},
+    contract::{CroncatApp, CroncatResult},
+    state::{ACTIVE_TASKS, REMOVED_TASK_MANAGER_ADDR, TEMP_TASK_KEY},
+    utils::user_balance_nonempty,
 };
 
 use abstract_sdk::{
@@ -14,13 +14,8 @@ use croncat_sdk_manager::msg::ManagerExecuteMsg;
 
 pub fn create_task_reply(deps: DepsMut, _env: Env, app: CroncatApp, reply: Reply) -> CroncatResult {
     let (task, bin) = reply_handle_croncat_task_creation(reply)?;
-
-    ACTIVE_TASKS.update(deps.storage, &task.task_hash, |ver| match ver {
-        Some(_) => Err(AppError::TaskAlreadyExists {
-            task_hash: task.task_hash.clone(),
-        }),
-        None => Ok(task.version),
-    })?;
+    let key = TEMP_TASK_KEY.load(deps.storage)?;
+    ACTIVE_TASKS.save(deps.storage, key, &(task.task_hash.clone(), task.version))?;
 
     Ok(app.tag_response(
         Response::new()
@@ -37,7 +32,7 @@ pub fn task_remove_reply(
     _reply: Reply,
 ) -> CroncatResult {
     let manager_addr = REMOVED_TASK_MANAGER_ADDR.load(deps.storage)?;
-    let response = if check_users_balance_nonempty(
+    let response = if user_balance_nonempty(
         deps.as_ref(),
         app.proxy_address(deps.as_ref())?,
         manager_addr.clone(),

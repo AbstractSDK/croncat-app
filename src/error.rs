@@ -33,6 +33,6 @@ pub enum AppError {
     #[error("Unable to get croncat version")]
     UnknownVersion {},
 
-    #[error("Task already exists {task_hash}")]
-    TaskAlreadyExists { task_hash: String },
+    #[error("Task already exists {task_tag}")]
+    TaskAlreadyExists { task_tag: String },
 }

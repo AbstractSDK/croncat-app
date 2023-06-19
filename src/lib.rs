@@ -2,6 +2,7 @@ mod api;
 pub mod contract;
 pub mod error;
 mod handlers;
+mod utils;
 
 pub mod msg;
 mod replies;
