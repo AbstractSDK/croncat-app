@@ -124,12 +124,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         &self,
         start_after: Option<(impl Into<String>, impl Into<String>)>,
         limit: Option<u32>,
+        checked: Option<bool>,
     ) -> AbstractSdkResult<Vec<(Addr, String)>> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::ActiveTasks {
                 start_after: start_after.map(|(addr, tag)| (addr.into(), tag.into())),
                 limit,
+                checked,
             },
         )
     }
@@ -140,6 +142,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         creator_addr: String,
         start_after: Option<impl Into<String>>,
         limit: Option<u32>,
+        checked: Option<bool>,
     ) -> AbstractSdkResult<Vec<String>> {
         self.base.apps(self.deps).query(
             self.module_id,
@@ -147,6 +150,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
                 creator_addr,
                 start_after: start_after.map(Into::into),
                 limit,
+                checked,
             },
         )
     }

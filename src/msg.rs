@@ -27,6 +27,7 @@ pub enum AppExecuteMsg {
         task_tag: String,
     },
     RefillTask {
+        /// check
         task_tag: String,
         assets: AssetListUnchecked,
     },
@@ -37,24 +38,58 @@ pub enum AppExecuteMsg {
 #[cfg_attr(feature = "interface", impl_into(QueryMsg))]
 #[derive(QueryResponses)]
 pub enum AppQueryMsg {
+    /// Get config
     #[returns(ConfigResponse)]
     Config {},
+    /// Get active tasks
     #[returns(Vec<(Addr, String)>)]
     ActiveTasks {
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "The addr and task tag to start listing after."
+        )]
         start_after: Option<(String, String)>,
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "Maximum number of tasks to return. Default limit is 50, if not set"
+        )]
         limit: Option<u32>,
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "On true check if this task exist on croncat contract and filter if it doesn't."
+        )]
+        #[cfg_attr(not(feature = "interface"), doc = "Defaults to false")]
+        checked: Option<bool>,
     },
+    /// Get active tasks by creator
     #[returns(Vec<String>)]
     ActiveTasksByCreator {
+        #[cfg_attr(not(feature = "interface"), doc = "The addr of creator of tasks")]
         creator_addr: String,
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "The task tag to start listing after."
+        )]
         start_after: Option<String>,
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "Maximum number of tasks to return. Default limit is 50, if not set"
+        )]
         limit: Option<u32>,
+        #[cfg_attr(
+            not(feature = "interface"),
+            doc = "On true check if this task exist on croncat contract and filter if it doesn't."
+        )]
+        #[cfg_attr(not(feature = "interface"), doc = "Defaults to false")]
+        checked: Option<bool>,
     },
+    /// Get task info
     #[returns(croncat_sdk_tasks::types::TaskResponse)]
     TaskInfo {
         creator_addr: String,
         task_tag: String,
     },
+    /// Get task balance
     #[returns(croncat_sdk_manager::types::TaskBalanceResponse)]
     TaskBalance {
         creator_addr: String,
