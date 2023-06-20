@@ -42,7 +42,7 @@ pub enum AppQueryMsg {
     #[returns(ConfigResponse)]
     Config {},
     /// Get active tasks
-    #[returns(Vec<(Addr, String)>)]
+    #[returns(ActiveTasksResponse)]
     ActiveTasks {
         #[cfg_attr(
             not(feature = "interface"),
@@ -62,7 +62,7 @@ pub enum AppQueryMsg {
         checked: Option<bool>,
     },
     /// Get active tasks by creator
-    #[returns(Vec<String>)]
+    #[returns(ActiveTasksByCreatorResponse)]
     ActiveTasksByCreator {
         #[cfg_attr(not(feature = "interface"), doc = "The addr of creator of tasks")]
         creator_addr: String,
@@ -108,4 +108,26 @@ pub enum Cw20HookMsg {
 #[cosmwasm_schema::cw_serde]
 pub struct ConfigResponse {
     pub config: Config,
+}
+
+#[cosmwasm_schema::cw_serde]
+pub enum ActiveTasksResponse {
+    Unchecked {
+        tasks: Vec<(Addr, String)>,
+    },
+    Checked {
+        scheduled_tasks: Vec<(Addr, String)>,
+        removed_tasks: Vec<(Addr, String)>,
+    },
+}
+
+#[cosmwasm_schema::cw_serde]
+pub enum ActiveTasksByCreatorResponse {
+    Unchecked {
+        tasks: Vec<String>,
+    },
+    Checked {
+        scheduled_tasks: Vec<String>,
+        removed_tasks: Vec<String>,
+    },
 }

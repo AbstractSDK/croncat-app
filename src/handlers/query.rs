@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::contract::{CroncatApp, CroncatResult};
-use crate::msg::{AppQueryMsg, ConfigResponse};
+use crate::msg::{ActiveTasksByCreatorResponse, ActiveTasksResponse, AppQueryMsg, ConfigResponse};
 use crate::state::{ACTIVE_TASKS, CONFIG};
 use crate::utils::factory_addr;
 use abstract_sdk::features::AbstractNameService;
@@ -16,15 +18,27 @@ pub const DEFAULT_LIMIT: u32 = 50;
 
 fn check_if_task_exists(
     querier: &QuerierWrapper,
+    manager_addrs: &mut HashMap<String, Addr>,
     factory_addr: Addr,
     task_hash: String,
     task_version: String,
 ) -> bool {
-    let manager_addr =
-        match get_croncat_contract(querier, factory_addr, MANAGER_NAME.to_owned(), task_version) {
-            Ok(addr) => addr,
+    let manager_addr = if let Some(addr) = manager_addrs.get(&task_version) {
+        addr.clone()
+    } else {
+        match get_croncat_contract(
+            querier,
+            factory_addr,
+            MANAGER_NAME.to_owned(),
+            task_version.clone(),
+        ) {
+            Ok(addr) => {
+                manager_addrs.insert(task_version, addr.clone());
+                addr
+            }
             Err(_) => return false,
-        };
+        }
+    };
     matches!(
         croncat_manager::state::TASKS_BALANCES.query(querier, manager_addr, task_hash.as_bytes()),
         Ok(Some(_))
@@ -80,7 +94,7 @@ fn query_active_tasks(
     start_after: Option<(String, String)>,
     limit: Option<u32>,
     checked: Option<bool>,
-) -> CroncatResult<Vec<(Addr, String)>> {
+) -> CroncatResult<ActiveTasksResponse> {
     let check = checked.unwrap_or(false);
     let limit = limit.unwrap_or(DEFAULT_LIMIT) as usize;
 
@@ -95,28 +109,47 @@ fn query_active_tasks(
         cosmwasm_std::Order::Ascending,
     );
 
-    let res: StdResult<Vec<(Addr, String)>> = match check {
+    let response = match check {
         true => {
             let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
+            let mut manager_addrs = HashMap::new();
+            let mut removed_tasks = Vec::new();
 
             // filter tasks that doesn't exist on croncat contract anymore
-            iter.filter(|res| {
-                res.as_ref().map_or(true, |(_, (task_hash, version))| {
-                    check_if_task_exists(
-                        &deps.querier,
-                        factory_addr.clone(),
-                        task_hash.clone(),
-                        version.clone(),
-                    )
+            let tasks_result: StdResult<Vec<(Addr, String)>> = iter
+                .filter(|res| {
+                    res.as_ref().map_or(true, |(k, (task_hash, version))| {
+                        if check_if_task_exists(
+                            &deps.querier,
+                            &mut manager_addrs,
+                            factory_addr.clone(),
+                            task_hash.clone(),
+                            version.clone(),
+                        ) {
+                            true
+                        } else {
+                            removed_tasks.push(k.clone());
+                            false
+                        }
+                    })
                 })
-            })
-            .map(|res| res.map(|(k, _)| k))
-            .take(limit)
-            .collect()
+                .map(|res| res.map(|(k, _)| k))
+                .take(limit)
+                .collect();
+            ActiveTasksResponse::Checked {
+                scheduled_tasks: tasks_result?,
+                removed_tasks,
+            }
         }
-        false => iter.map(|res| res.map(|(k, _)| k)).take(limit).collect(),
+        false => {
+            let tasks_result: StdResult<Vec<(Addr, String)>> =
+                iter.map(|res| res.map(|(k, _)| k)).take(limit).collect();
+            ActiveTasksResponse::Unchecked {
+                tasks: tasks_result?,
+            }
+        }
     };
-    res.map_err(Into::into)
+    Ok(response)
 }
 
 fn query_active_tasks_by_creator(
@@ -126,7 +159,7 @@ fn query_active_tasks_by_creator(
     start_after: Option<String>,
     limit: Option<u32>,
     checked: Option<bool>,
-) -> CroncatResult<Vec<String>> {
+) -> CroncatResult<ActiveTasksByCreatorResponse> {
     let addr = deps.api.addr_validate(&creator)?;
     let check = checked.unwrap_or(false);
     let limit = limit.unwrap_or(DEFAULT_LIMIT) as usize;
@@ -138,28 +171,44 @@ fn query_active_tasks_by_creator(
         cosmwasm_std::Order::Ascending,
     );
 
-    let res: StdResult<Vec<String>> = match check {
+    match check {
         true => {
             let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
-
+            let mut manager_addrs = HashMap::new();
+            let mut removed_tasks = Vec::new();
+            
             // filter tasks that doesn't exist on croncat contract anymore
-            iter.filter(|res| {
-                res.as_ref().map_or(true, |(_, (task_hash, version))| {
-                    check_if_task_exists(
-                        &deps.querier,
-                        factory_addr.clone(),
-                        task_hash.clone(),
-                        version.clone(),
-                    )
+            let tasks_res: StdResult<Vec<String>> = iter
+                .filter(|res| {
+                    res.as_ref().map_or(true, |(k, (task_hash, version))| {
+                        if check_if_task_exists(
+                            &deps.querier,
+                            &mut manager_addrs,
+                            factory_addr.clone(),
+                            task_hash.clone(),
+                            version.clone(),
+                        ) {
+                            true
+                        } else {
+                            removed_tasks.push(k.clone());
+                            false
+                        }
+                    })
                 })
+                .map(|res| res.map(|(k, _)| k))
+                .take(limit)
+                .collect();
+            Ok(ActiveTasksByCreatorResponse::Checked {
+                scheduled_tasks: tasks_res?,
+                removed_tasks,
             })
-            .map(|res| res.map(|(k, _)| k))
-            .take(limit)
-            .collect()
         }
-        false => iter.map(|res| res.map(|(k, _)| k)).take(limit).collect(),
-    };
-    res.map_err(Into::into)
+        false => {
+            let tasks_res: StdResult<Vec<String>> =
+                iter.map(|res| res.map(|(k, _)| k)).take(limit).collect();
+            Ok(ActiveTasksByCreatorResponse::Unchecked { tasks: tasks_res? })
+        }
+    }
 }
 
 fn query_task_info(
