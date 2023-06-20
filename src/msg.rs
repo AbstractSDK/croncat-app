@@ -27,7 +27,6 @@ pub enum AppExecuteMsg {
         task_tag: String,
     },
     RefillTask {
-        /// check
         task_tag: String,
         assets: AssetListUnchecked,
     },
