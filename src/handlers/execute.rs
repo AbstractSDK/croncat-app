@@ -37,6 +37,7 @@ pub fn execute_handler(
         AppExecuteMsg::RefillTask { task_tag, assets } => {
             refill_task(deps.as_ref(), env, info, app, task_tag, assets)
         }
+        AppExecuteMsg::Purge { task_tags } => purge(deps, env, info, app, task_tags),
     }
 }
 
@@ -255,4 +256,26 @@ fn refill_task(
     let msg = executor.execute(vec![account_action])?;
 
     Ok(app.tag_response(Response::new().add_message(msg), "refill_task"))
+}
+
+fn purge(
+    deps: DepsMut,
+    _env: Env,
+    msg_info: MessageInfo,
+    app: CroncatApp,
+    task_tags: Vec<String>,
+) -> CroncatResult {
+    // In case module got unregistered or admin got changed they have no reason to purge now
+    if app
+        .admin
+        .assert_admin(deps.as_ref(), &msg_info.sender)
+        .is_err()
+    {
+        assert_module_installed(deps.as_ref(), &msg_info.sender, &app)?;
+    }
+
+    for tag in task_tags {
+        ACTIVE_TASKS.remove(deps.storage, (msg_info.sender.clone(), tag));
+    }
+    Ok(app.tag_response(Response::new(), "purge"))
 }

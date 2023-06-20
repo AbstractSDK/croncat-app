@@ -176,7 +176,7 @@ fn query_active_tasks_by_creator(
             let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
             let mut manager_addrs = HashMap::new();
             let mut removed_tasks = Vec::new();
-            
+
             // filter tasks that doesn't exist on croncat contract anymore
             let tasks_res: StdResult<Vec<String>> = iter
                 .filter(|res| {

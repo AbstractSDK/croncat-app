@@ -30,6 +30,9 @@ pub enum AppExecuteMsg {
         task_tag: String,
         assets: AssetListUnchecked,
     },
+    Purge {
+        task_tags: Vec<String>,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]
