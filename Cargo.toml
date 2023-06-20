@@ -65,6 +65,7 @@ croncat-sdk-manager = "1.0.3"
 croncat-integration-utils = "1.1.0"
 # TODO: avoid using contract dep
 croncat-factory = { version = "1.0.3", features = ["library"] }
+croncat-manager = { version = "1.0.3", features = ["library"] }
 
 [dev-dependencies]
 app = { path = ".", features = ["interface"] }

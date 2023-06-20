@@ -86,6 +86,12 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
             },
         )
     }
+
+    pub fn purge(&self, task_tags: Vec<String>) -> AbstractSdkResult<CosmosMsg> {
+        self.base
+            .apps(self.deps)
+            .request(self.module_id, AppExecuteMsg::Purge { task_tags })
+    }
 }
 
 impl<'a, T: CronCatInterface> CronCat<'a, T> {
@@ -124,12 +130,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         &self,
         start_after: Option<(impl Into<String>, impl Into<String>)>,
         limit: Option<u32>,
+        checked: Option<bool>,
     ) -> AbstractSdkResult<Vec<(Addr, String)>> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::ActiveTasks {
                 start_after: start_after.map(|(addr, tag)| (addr.into(), tag.into())),
                 limit,
+                checked,
             },
         )
     }
@@ -140,6 +148,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         creator_addr: String,
         start_after: Option<impl Into<String>>,
         limit: Option<u32>,
+        checked: Option<bool>,
     ) -> AbstractSdkResult<Vec<String>> {
         self.base.apps(self.deps).query(
             self.module_id,
@@ -147,6 +156,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
                 creator_addr,
                 start_after: start_after.map(Into::into),
                 limit,
+                checked,
             },
         )
     }
@@ -264,6 +274,41 @@ mod test {
         });
 
         let actual = cron_cat.remove_task(task_tag);
+
+        assert_that!(actual).is_ok();
+
+        let actual = match actual.unwrap() {
+            CosmosMsg::Wasm(msg) => msg,
+            _ => panic!("expected wasm msg"),
+        };
+        let expected = wasm_execute(
+            abstract_testing::prelude::TEST_MODULE_ADDRESS,
+            &expected,
+            vec![],
+        )
+        .unwrap();
+
+        assert_that!(actual).is_equal_to(expected);
+    }
+
+    #[test]
+    fn purge_msg() {
+        let mut deps = mock_dependencies();
+        deps.querier = abstract_testing::mock_querier();
+        let stub = MockModule::new();
+        let mut cron_cat = stub.cron_cat(deps.as_ref());
+        cron_cat.module_id = TEST_MODULE_ID;
+
+        let task_tag1 = TEST_TASK_HASH.to_owned();
+        let task_tag2 = TEST_TASK_HASH.chars().rev().collect();
+
+        let task_tags = vec![task_tag1, task_tag2];
+
+        let expected = ExecuteMsg::from(AppExecuteMsg::Purge {
+            task_tags: task_tags.clone(),
+        });
+
+        let actual = cron_cat.purge(task_tags);
 
         assert_that!(actual).is_ok();
 
