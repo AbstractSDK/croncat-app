@@ -90,3 +90,6 @@ croncat-integration-testing = "1.1.0"
 
 # Testing cw20
 cw20-base = "0.16.0"
+
+[patch.crates-io]
+cw-orch = { git = "https://github.com/AbstractSDK/cw-orchestrator.git" }
