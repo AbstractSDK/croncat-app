@@ -6,8 +6,8 @@ use cw_orch::{
 
 use abstract_interface::AppDeployer;
 use app::contract::{interface::CroncatApp, CRONCAT_ID};
-use semver::Version;
 use dotenv::dotenv;
+use semver::Version;
 
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
