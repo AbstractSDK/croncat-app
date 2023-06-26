@@ -35,25 +35,37 @@ check:
   cargo check --all-features
 
 deploy:
-  cargo run --example deploy --features
+  cargo run --example deploy
 
 wasm:
-  docker run --rm -v "$(pwd)":/code \
-  --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
-  --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-  cosmwasm/rust-optimizer:0.12.13
+  #!/usr/bin/env bash
 
+  # Delete all the current wasms first
+  rm -rf ./artifacts/*.wasm
+  
+  if [[ $(arch) == "arm64" ]]; then
+    image="cosmwasm/rust-optimizer-arm64"
+  else
+    image="cosmwasm/rust-optimizer"
+  fi
+
+  # Optimized builds
+  docker run --rm -v "$(pwd)":/code \
+    --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
+    --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+    ${image}:0.12.13
+    
 # Generate the schemas for the app contract
 schema:
   cargo schema
 
 # Generate the typescript client for the app contract
 ts-codegen: schema
-  (cd ts-sdk && npm run codegen)
+  (cd typescript && npm run codegen)
 
 # Publish the typescript sdk
 ts-publish: ts-codegen
-  (cd ts-sdk && npm publish --access public)
+  (cd typescript && npm publish --access public)
 
 # Generate the schemas for this app and publish them to the schemas repository for access in the Abstract frontend
 publish-schemas namespace name version: schema
