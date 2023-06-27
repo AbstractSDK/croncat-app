@@ -1,4 +1,4 @@
-pub mod api;
+mod api;
 pub mod contract;
 pub mod error;
 mod handlers;
@@ -13,6 +13,6 @@ pub use contract::interface::CroncatApp;
 #[cfg(feature = "interface")]
 pub use msg::{AppExecuteMsgFns, AppQueryMsgFns};
 
-pub use api::{CronCat, CRON_CAT_FACTORY};
+pub use api::{CronCat, CronCatInterface, CRON_CAT_FACTORY};
 
 pub use croncat_integration_utils::CronCatTaskRequest;
