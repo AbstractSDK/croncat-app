@@ -1,4 +1,4 @@
-mod api;
+pub mod api;
 pub mod contract;
 pub mod error;
 mod handlers;
