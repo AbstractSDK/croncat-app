@@ -14,3 +14,5 @@ pub use contract::interface::CroncatApp;
 pub use msg::{AppExecuteMsgFns, AppQueryMsgFns};
 
 pub use api::{CronCat, CRON_CAT_FACTORY};
+
+pub use croncat_integration_utils::CronCatTaskRequest;
