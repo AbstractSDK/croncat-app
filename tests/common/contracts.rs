@@ -1,5 +1,5 @@
-use app::msg::{ActiveTasksByCreatorResponse, ActiveTasksResponse};
 use cosmwasm_std::{Addr, Empty};
+use croncat_app::msg::{ActiveTasksByCreatorResponse, ActiveTasksResponse};
 use cw_multi_test::{Contract, ContractWrapper};
 
 pub(crate) use croncat_integration_testing::contracts::{

@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "croncat-app"
 version = "0.0.1"
 authors = [
   "CyberHoward <cyberhoward@protonmail.com>",
@@ -68,7 +68,7 @@ croncat-factory = { version = "1.0.3", features = ["library"] }
 croncat-manager = { version = "1.0.3", features = ["library"] }
 
 [dev-dependencies]
-app = { path = ".", features = ["interface"] }
+croncat-app = { path = ".", features = ["interface"] }
 abstract-interface = { version = "0.16.1", features = ["daemon"] }
 abstract-testing = { version = "0.16.1" }
 abstract-sdk = { version = "0.16.1", features = ["test-utils"] }

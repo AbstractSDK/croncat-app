@@ -9,7 +9,8 @@ use abstract_core::{
 };
 use abstract_interface::{Abstract, AbstractAccount, AppDeployer, VCExecFns};
 
-use app::{
+use common::contracts;
+use croncat_app::{
     contract::{CRONCAT_ID, CRONCAT_MODULE_VERSION},
     error::AppError,
     msg::{
@@ -19,7 +20,6 @@ use app::{
     state::Config,
     AppExecuteMsgFns, AppQueryMsgFns, CroncatApp, CRON_CAT_FACTORY,
 };
-use common::contracts;
 
 use croncat_integration_utils::{AGENTS_NAME, MANAGER_NAME, TASKS_NAME};
 use croncat_sdk_agents::msg::InstantiateMsg as AgentsInstantiateMsg;

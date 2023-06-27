@@ -313,44 +313,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
-name = "app"
-version = "0.0.1"
-dependencies = [
- "abstract-app",
- "abstract-core",
- "abstract-interface",
- "abstract-sdk",
- "abstract-testing",
- "app",
- "cosmwasm-schema",
- "cosmwasm-std",
- "croncat-agents",
- "croncat-factory",
- "croncat-integration-testing",
- "croncat-integration-utils",
- "croncat-manager",
- "croncat-sdk-agents",
- "croncat-sdk-factory",
- "croncat-sdk-manager",
- "croncat-sdk-tasks",
- "croncat-tasks",
- "cw-asset",
- "cw-controllers",
- "cw-multi-test",
- "cw-orch",
- "cw-storage-plus 1.1.0",
- "cw2 1.0.1",
- "cw20 0.16.0",
- "cw20-base 0.16.0",
- "dotenv",
- "env_logger",
- "schemars",
- "semver",
- "speculoos",
- "thiserror",
-]
-
-[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -787,6 +749,44 @@ dependencies = [
  "cw-utils 0.16.0",
  "cw2 1.0.1",
  "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "croncat-app"
+version = "0.0.1"
+dependencies = [
+ "abstract-app",
+ "abstract-core",
+ "abstract-interface",
+ "abstract-sdk",
+ "abstract-testing",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "croncat-agents",
+ "croncat-app",
+ "croncat-factory",
+ "croncat-integration-testing",
+ "croncat-integration-utils",
+ "croncat-manager",
+ "croncat-sdk-agents",
+ "croncat-sdk-factory",
+ "croncat-sdk-manager",
+ "croncat-sdk-tasks",
+ "croncat-tasks",
+ "cw-asset",
+ "cw-controllers",
+ "cw-multi-test",
+ "cw-orch",
+ "cw-storage-plus 1.1.0",
+ "cw2 1.0.1",
+ "cw20 0.16.0",
+ "cw20-base 0.16.0",
+ "dotenv",
+ "env_logger",
+ "schemars",
+ "semver",
+ "speculoos",
  "thiserror",
 ]
 

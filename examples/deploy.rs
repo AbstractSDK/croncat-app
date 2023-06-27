@@ -7,7 +7,7 @@ use cw_orch::{
 };
 
 use abstract_interface::*;
-use app::{
+use croncat_app::{
     contract::{interface::CroncatApp, CRONCAT_ID},
     msg::AppInstantiateMsg,
 };
@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
     // Install app
     account.install_module(
         CRONCAT_ID,
-        &app::msg::InstantiateMsg {
+        &croncat_app::msg::InstantiateMsg {
             base: BaseInstantiateMsg {
                 ans_host_address: abstract_deployment.ans_host.addr_str()?,
             },
