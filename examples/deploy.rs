@@ -28,8 +28,8 @@ fn main() -> anyhow::Result<()> {
         .build()?;
     let app = CroncatApp::new(CRONCAT_ID, chain.clone());
 
-    // It's already deployed
-    // app.deploy(version)?;
+    // Deploy
+    app.deploy(version)?;
 
     // Create account
     let abstract_deployment = Abstract::load_from(chain.clone())?;
