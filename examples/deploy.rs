@@ -28,9 +28,6 @@ fn main() -> anyhow::Result<()> {
         .build()?;
     let app = CroncatApp::new(CRONCAT_ID, chain.clone());
 
-    // Deploy
-    app.deploy(version)?;
-
     // Create account
     let abstract_deployment = Abstract::load_from(chain.clone())?;
     let account = abstract_deployment.account_factory.create_default_account(
@@ -52,6 +49,9 @@ fn main() -> anyhow::Result<()> {
         account_config.account_id.u64() as u32,
         vec!["croncat".to_owned()],
     )?;
+
+    // Deploy
+    app.deploy(version)?;
 
     // Install app
     account.install_module(
