@@ -15,4 +15,5 @@ pub use msg::{AppExecuteMsgFns, AppQueryMsgFns};
 
 pub use api::{CronCat, CronCatInterface, CRON_CAT_FACTORY};
 
-pub use croncat_integration_utils::CronCatTaskRequest;
+// For re-exports of other crates
+pub use croncat_integration_utils;
