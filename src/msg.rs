@@ -97,6 +97,13 @@ pub enum AppQueryMsg {
         creator_addr: String,
         task_tag: String,
     },
+    /// Get manager address of task
+    /// Used to verify sender
+    #[returns(Addr)]
+    ManagerAddr {
+        creator_addr: String,
+        task_tag: String,
+    },
 }
 
 #[cosmwasm_schema::cw_serde]

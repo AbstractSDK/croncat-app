@@ -50,14 +50,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     pub fn create_task(
         &self,
         task: CronCatTaskRequest,
-        task_tag: String,
+        task_tag: impl Into<String>,
         assets: AssetListUnchecked,
     ) -> AbstractSdkResult<CosmosMsg> {
         self.base.apps(self.deps).request(
             self.module_id,
             AppExecuteMsg::CreateTask {
                 task: Box::new(task),
-                task_tag,
+                task_tag: task_tag.into(),
                 assets,
             },
         )
@@ -128,14 +128,14 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Active tasks
     pub fn query_active_tasks(
         &self,
-        start_after: Option<(impl Into<String>, impl Into<String>)>,
+        start_after: Option<(String, String)>,
         limit: Option<u32>,
         checked: Option<bool>,
     ) -> AbstractSdkResult<Vec<(Addr, String)>> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::ActiveTasks {
-                start_after: start_after.map(|(addr, tag)| (addr.into(), tag.into())),
+                start_after,
                 limit,
                 checked,
             },
@@ -145,7 +145,7 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
     /// Active tasks by creator
     pub fn query_active_tasks_by_creator(
         &self,
-        creator_addr: String,
+        creator_addr: impl Into<String>,
         start_after: Option<impl Into<String>>,
         limit: Option<u32>,
         checked: Option<bool>,
@@ -153,10 +153,24 @@ impl<'a, T: CronCatInterface> CronCat<'a, T> {
         self.base.apps(self.deps).query(
             self.module_id,
             AppQueryMsg::ActiveTasksByCreator {
-                creator_addr,
+                creator_addr: creator_addr.into(),
                 start_after: start_after.map(Into::into),
                 limit,
                 checked,
+            },
+        )
+    }
+
+    pub fn query_manager_addr(
+        &self,
+        creator_addr: impl Into<String>,
+        task_tag: impl Into<String>,
+    ) -> AbstractSdkResult<Addr> {
+        self.base.apps(self.deps).query(
+            self.module_id,
+            AppQueryMsg::ManagerAddr {
+                creator_addr: creator_addr.into(),
+                task_tag: task_tag.into(),
             },
         )
     }

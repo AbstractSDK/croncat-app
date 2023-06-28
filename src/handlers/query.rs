@@ -79,6 +79,10 @@ pub fn query_handler(
             creator_addr,
             task_tag,
         } => to_binary(&query_task_balance(deps, app, creator_addr, task_tag)?),
+        AppQueryMsg::ManagerAddr {
+            creator_addr,
+            task_tag,
+        } => to_binary(&query_manager_addr(deps, app, creator_addr, task_tag)?),
     }
     .map_err(Into::into)
 }
@@ -226,8 +230,7 @@ fn query_task_info(
         factory_addr,
         TASKS_NAME.to_owned(),
         task_version,
-    )
-    .unwrap();
+    )?;
 
     let task_info: TaskResponse = deps
         .querier
@@ -250,11 +253,29 @@ fn query_task_balance(
         factory_addr,
         MANAGER_NAME.to_owned(),
         task_version,
-    )
-    .unwrap();
+    )?;
 
     let task_balance: TaskBalanceResponse = deps
         .querier
         .query_wasm_smart(manager_addr, &ManagerQueryMsg::TaskBalance { task_hash })?;
     Ok(task_balance)
+}
+
+fn query_manager_addr(
+    deps: Deps,
+    app: &CroncatApp,
+    creator_addr: String,
+    task_tag: String,
+) -> CroncatResult<Addr> {
+    let creator_addr = deps.api.addr_validate(&creator_addr)?;
+    let (_, task_version) = ACTIVE_TASKS.load(deps.storage, (creator_addr, task_tag))?;
+
+    let factory_addr = factory_addr(&deps.querier, &app.ans_host(deps)?)?;
+    let manager_addr = get_croncat_contract(
+        &deps.querier,
+        factory_addr,
+        MANAGER_NAME.to_owned(),
+        task_version,
+    )?;
+    Ok(manager_addr)
 }
